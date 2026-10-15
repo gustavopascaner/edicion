@@ -2,6 +2,15 @@
 
 Edita un video crudo vertical (talking head) con corte ajustado sin pausas, motion graphics con alfa, subtítulos dinámicos, b-roll y efectos de sonido, y entrega un **XML para Premiere** con todos los assets enlazados.
 
+Qué hace:
+- **Corte ajustado**: saca pausas, tomas falladas y repeticiones, y verifica el corte re-transcribiéndolo.
+- **Motion graphics** con alfa (tarjetas, listas, sellos, pantallas completas) sincronizados con las palabras, y **subtítulos dinámicos**.
+- **B-roll semántico y música de Envato**: elige 3 momentos, busca con el MCP de Envato, ubica las vistas previas y las reemplaza por los originales licenciados.
+- **Diseño sonoro automático** con la librería de SFX: cada aparición, check, tachado, sello o corte suena, con control de densidad.
+- **Reencuadres y zooms** según la intención de cada frase (snap en el gancho, punch-in en el énfasis, alternancia para disimular jump cuts).
+- **Dirección creativa**: revisa que b-roll, gráficos, subtítulos, cámara, SFX y música no compitan, y dibuja la línea de tiempo.
+- **Tiempo de procesamiento**: al terminar informa cuánto tardó, con el desglose por paso.
+
 Las instrucciones para el agente están en [`SKILL.md`](SKILL.md).
 
 ## Instalación (macOS)
@@ -35,6 +44,8 @@ Resultado en la carpeta del video: `<NOMBRE>_EDIT/` con el XML, `Assets/{MG,Subt
 | `engine/` | Motor HTML de motion graphics (se renderiza con Chrome) y tipografías |
 | `reference/` | Catálogo de escenas y un `jobs.js` de ejemplo |
 | `assets/sfx/` | Librería de efectos de sonido + `catalog.json` |
+| `scripts/envato.py` | Búsqueda en Envato, vistas previas, reemplazo por originales licenciados |
+| `scripts/director.js` | Revisión de dirección creativa + línea de tiempo |
 | `agents/openai.yaml` | Metadatos para Codex |
 
 ## Efectos de sonido
@@ -49,3 +60,7 @@ Sumar un sonido: `python3 -I scripts/sfx_import.py archivo.wav --id nombre --cat
 El importador recorta silencios, normaliza a −16 LUFS, convierte a WAV 48 kHz y lo registra en el catálogo.
 
 Las tipografías de `engine/fonts` (Bricolage Grotesque, Instrument Serif, Inter Tight, JetBrains Mono) son de Google Fonts, con licencia SIL Open Font License.
+
+## Envato
+
+El MCP público de Envato solo busca, no descarga ni licencia. `scripts/envato.py` lo usa por HTTP, así que no hace falta configurarlo en el agente. Mientras el material no esté licenciado, el XML usa las vistas previas con marca de agua (con el prefijo `PREVIEW_`). Para licenciar, alguien con cuenta de Envato Elements descarga cada ítem desde su link (*Download* → licenciar para el proyecto). Después, `envato.py collect` los toma de `~/Downloads` y actualiza la edición.

@@ -6,6 +6,7 @@ Lee config.json (fps, tail = segundos extra al final para que se lea el último 
 import json,os,sys,subprocess
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Línea de tiempo + verificación',time.time()-_t0))
 FPS=cfg.get('fps',30);PRE,POST=0.04,0.06;TAIL=cfg.get('tail',1.2)
 P=json.load(open(os.path.join(W,'tight.json')))
 f=lambda x:int(round(x*FPS))

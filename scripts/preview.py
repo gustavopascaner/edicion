@@ -4,14 +4,16 @@
 """
 import json,os,subprocess,sys
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Vista previa',time.time()-_t0))
 EDIT=cfg['edit_dir'];SRC=cfg['src'];FPS=cfg.get('fps',30);NAME=cfg['name'];VER=cfg.get('version',1)
 e=json.load(open(os.path.join(W,'edl.json')));jobs=json.load(open(os.path.join(W,'jobs.json')));br=json.load(open(os.path.join(W,'broll.json')))
 fr=lambda x:int(round(x*FPS))
 out=os.path.join(EDIT,f'{NAME}_v{VER}_PREVIEW.mp4')
+FR={f['i']:f for f in json.load(open(os.path.join(W,'framing.json')))} if os.path.exists(os.path.join(W,'framing.json')) else {}
 inputs=['-i',SRC];fc=[]
 for c in e['clips']:
     i=c['i'];a=c['src_in']/FPS;b=c['src_out']/FPS
-    z="scale=1080:1920" if i%2==0 else "scale=1274:-2,crop=1080:1920"
+    sc=FR.get(i,{}).get('s1',100 if i%2==0 else 118);z=f"scale={round(1080*sc/100)//2*2}:-2,crop=1080:1920"
     fc.append(f"[0:v]trim=start={a:.4f}:end={b:.4f},setpts=PTS-STARTPTS,fps={FPS},{z},setsar=1,format=yuv420p[v{i}]")
     fc.append(f"[0:a]atrim=start={a:.4f}:end={b:.4f},asetpts=PTS-STARTPTS[a{i}]")
 N=len(e['clips']);fc.append(''.join(f'[v{i}][a{i}]' for i in range(N))+f'concat=n={N}:v=1:a=1[base][dlg]')
@@ -35,6 +37,8 @@ sfx=json.load(open(os.path.join(W,'sfx.json'))) if os.path.exists(os.path.join(W
 for x in sfx:
     inputs+=['-i',os.path.join(LIB,x['file'])];d=int(x['start']*1000)
     fc.append(f"[{k}:a]atrim=start={x['sin']}:duration={x['dur']},asetpts=PTS-STARTPTS,volume={x['gain']},adelay={d}|{d}[s{k}]");sl.append(f'[s{k}]');k+=1
+M=cfg.get('music')
+if isinstance(M,dict) and M.get('path'): br['extraSfx'].append({'file':M['path'],'start':0,'dur':e['total']/FPS,'gain':M.get('bed_gain',.08),'sin':M.get('offset',0)})
 for x in br['extraSfx']:
     inputs+=['-i',x['file']];d=int(x['start']*1000)
     fc.append(f"[{k}:a]atrim=start={x['sin']}:duration={x['dur']},asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,volume={x['gain']},adelay={d}|{d}[s{k}]");sl.append(f'[s{k}]');k+=1

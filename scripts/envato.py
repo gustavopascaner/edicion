@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""B-roll y música de Envato Elements.
+El MCP público de Envato (https://mcp.envato.com/mcp) solo BUSCA: no descarga ni licencia. Este script lo llama por HTTP
+(no hace falta tenerlo configurado en el agente), baja las vistas previas con marca de agua para elegir y ubicar el
+material, y después reemplaza cada vista previa por el original licenciado cuando aparece en Descargas.
+
+uso:
+  envato.py search <work> video "<términos en inglés>" [--n 8] [--vertical] [--sub Medical] [--min 5] [--max 30]
+  envato.py search <work> music "<términos>" [--n 6] [--mood inspiring] [--tempo "Medium (90-110 BPM)"] [--genre corporate]
+        → <work>/envato/<kind>_<slug>.json + hoja de candidatos <work>/envato/<kind>_<slug>.jpg (videos) / perfil de energía (música)
+  envato.py use <work> <clave> <búsqueda>#<n>     (ej. kl video_doctor-talking#3) → registra en config.json (broll[clave] o music)
+  envato.py collect <work> [--from ~/Downloads] [--file <clave> <archivo>]  → reemplaza vistas previas por originales licenciados
+  envato.py report <work>                          → tabla de procedencia (para el LEEME)
+"""
+import json,os,re,subprocess,sys,time,urllib.request,zipfile,shutil,math,array
+from concurrent.futures import ThreadPoolExecutor
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing
+MCP=os.environ.get('ENVATO_MCP_URL','https://mcp.envato.com/mcp');UA={'User-Agent':'Mozilla/5.0'}
+slug=lambda s:re.sub(r'[^a-z0-9]+','-',s.lower()).strip('-')[:40]
+norm=lambda s:re.sub(r'[^a-z0-9]','',s.lower())
+
+def mcp(tool,args):
+    body=json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/call','params':{'name':tool,'arguments':args}}).encode()
+    req=urllib.request.Request(MCP,body,{**UA,'Content-Type':'application/json','Accept':'application/json, text/event-stream'})
+    raw=urllib.request.urlopen(req,timeout=40).read().decode()
+    data=json.loads(next(l[6:] for l in raw.splitlines() if l.startswith('data: ')) if 'data: ' in raw else raw)
+    if 'error' in data: raise SystemExit(f"Envato MCP: {data['error']}")
+    return json.loads(data['result']['content'][0]['text'])
+def get(url,dst=None):
+    r=urllib.request.urlopen(urllib.request.Request(url,headers=UA),timeout=60).read()
+    if dst: open(dst,'wb').write(r)
+    return r
+def probe(p):
+    o=json.loads(subprocess.run(['ffprobe','-v','error','-show_entries','stream=codec_type,width,height,r_frame_rate,nb_frames:stream_side_data=rotation:format=duration','-of','json',p],capture_output=True,text=True).stdout)
+    v=next((s for s in o.get('streams',[]) if s['codec_type']=='video'),None);d=float(o['format']['duration'])
+    if not v: return dict(dur=d)
+    n,dd=map(int,v['r_frame_rate'].split('/'));rate=round(n/dd,3);w,h=v['width'],v['height']
+    rot=abs(int(next((x.get('rotation',0) for x in v.get('side_data_list',[])),0)))
+    if rot in(90,270): w,h=h,w
+    return dict(dur=d,w=w,h=h,rate=rate if abs(rate-round(rate))>0.01 else int(round(rate)),frames=int(v.get('nb_frames') or d*rate))
+def preview_url(page,kind,cover):
+    h=get(page).decode('utf-8','replace')
+    if kind=='video':
+        urls=re.findall(r'https://video-previews\.elements\.envatousercontent\.com/[^"\\\s]+?\.mp4',h)
+        uid=re.search(r'files/([0-9a-f-]{36})/',cover or '');own=[u for u in urls if uid and uid.group(1) in u]
+        return (own or urls or [None])[0]
+    return (re.findall(r'https://audio-previews\.elements\.envatousercontent\.com/[^"\\\s]+?\.mp3',h) or [None])[0]
+def energy(p,step=5):
+    raw=subprocess.run(['ffmpeg','-v','error','-i',p,'-ac','1','-ar','8000','-f','s16le','-'],capture_output=True).stdout
+    a=array.array('h',raw);n=8000*step;bars='▁▂▃▄▅▆▇█'
+    rms=[math.sqrt(sum(x*x for x in a[i:i+n:20])/max(1,len(a[i:i+n:20]))) for i in range(0,len(a),n)];m=max(rms) or 1
+    return ''.join(bars[min(7,int(r/m*7.99))] for r in rms)
+
+def search(W,kind,terms,o):
+    E=os.path.join(W,'envato');os.makedirs(E,exist_ok=True);name=f'{kind}_{slug(terms)}';n=int(o.get('n',8 if kind=='video' else 6))
+    f={}
+    if kind=='video':
+        f['categories']='Stock Footage'
+        if 'vertical' in o: f['orientation']='vertical'
+        if 'sub' in o: f['subcategories']=o['sub']
+        if 'min' in o: f['min_media_length']=int(o['min'])
+        if 'max' in o: f['max_media_length']=int(o['max'])
+        res=mcp('search_stock_video',{'searchTerms':terms[:60],'perPage':n,'sortBy':'relevance','languageCode':'en','filters':f})
+    else:
+        f={'categories':'Music Tracks','vocals_in_audio':'No Vocals'}
+        for k in('mood','tempo','genre','theme'):
+            if k in o: f[k]=o[k]
+        res=mcp('search_music',{'searchTerms':terms[:60],'perPage':n,'sortBy':'relevance','languageCode':'en','filters':f})
+    items=res['items'][:n]
+    def fetch(i_it):
+        i,it=i_it;it['n']=i+1;ext='mp4' if kind=='video' else 'mp3'
+        try:
+            u=preview_url(it['item_url'],kind,it.get('cover_image'));p=os.path.join(E,f"{name}_{i+1}.{ext}")
+            if u and not os.path.exists(p):
+                get(u,p);ar=it.get('aspect_ratio')
+                if kind=='video' and ar:   # las vistas previas vienen en 16:9 con barras: recortar al formato real
+                    q=probe(p)
+                    if abs(q['w']/q['h']-ar)>0.05:
+                        cw,ch=(q['h']*ar,q['h']) if ar<q['w']/q['h'] else (q['w'],q['w']/ar);cw,ch=int(cw)//2*2,int(ch)//2*2
+                        subprocess.run(['ffmpeg','-v','error','-y','-i',p,'-vf',f'crop={cw}:{ch}','-an','-c:v','libx264','-crf','20','-preset','veryfast',p+'.tmp.mp4'],check=True);os.replace(p+'.tmp.mp4',p)
+            if u: it['preview']=p;it.update(probe(p))
+        except Exception as e: it['error']=str(e)[:120]
+        return it
+    with ThreadPoolExecutor(6) as ex: items=list(ex.map(fetch,enumerate(items)))
+    json.dump({'kind':kind,'terms':terms,'filters':f,'items':items},open(os.path.join(E,name+'.json'),'w'),indent=1,ensure_ascii=False)
+    if kind=='video':
+        rows=[]
+        for it in items:
+            if 'preview' not in it: continue
+            r=os.path.join(E,f"_{name}_{it['n']}.jpg")
+            vf=f"fps=4/{max(it['dur'],1):.2f},scale=300:300:force_original_aspect_ratio=decrease,pad=300:300:(ow-iw)/2:(oh-ih)/2,tile=4x1,pad=1200:310:0:0:color=0x111111"
+            subprocess.run(['ffmpeg','-v','error','-y','-i',it['preview'],'-vf',vf,'-frames:v','1',r]);rows.append(r) if os.path.exists(r) else None
+        if rows:
+            sheet=os.path.join(E,name+'.jpg')
+            subprocess.run(['ffmpeg','-v','error','-y']+sum((['-i',r] for r in rows),[])+(['-filter_complex',f"vstack=inputs={len(rows)}"] if len(rows)>1 else [])+[sheet])
+            for r in rows: os.remove(r)
+            print('hoja de candidatos:',sheet,'(una fila por candidato, en orden: fila 1 = #'+str(int(rows[0].rsplit('_',1)[1][:-4]))+')' if rows else '')
+    for it in items:
+        extra=f"{it.get('w','?')}x{it.get('h','?')} {it.get('dur',0):.0f}s" if kind=='video' else f"{it.get('dur',0):.0f}s  energía {energy(it['preview']) if 'preview' in it else '?'}"
+        print(f"#{it['n']:<2} {it['title'][:50]:50s} · {it['author'][:18]:18s} · {extra}{'  ⚠️ '+it['error'] if 'error' in it else ''}")
+    print(f'→ elegir con: envato.py use "{W}" <clave> {name}#<n>')
+
+def cfgio(W,c=None):
+    p=os.path.join(W,'config.json')
+    if c is None: return json.load(open(p))
+    json.dump(c,open(p,'w'),indent=1,ensure_ascii=False)
+def use(W,key,ref):
+    name,n=ref.split('#');d=json.load(open(os.path.join(W,'envato',name+'.json')));it=next(x for x in d['items'] if x['n']==int(n))
+    if 'preview' not in it: raise SystemExit('ese candidato no tiene vista previa descargable; elegir otro')
+    c=cfgio(W);env=dict(url=it['item_url'],title=it['title'],author=it['author'],kind=d['kind'],search=d['terms'],status='preview',preview=it['preview'],chosen=time.time())
+    if d['kind']=='video':
+        c.setdefault('broll',{})[key]=dict(path=it['preview'],frames=it['frames'],rate=it['rate'],w=it['w'],h=it['h'],envato=env)
+    else:
+        m=c.get('music') if isinstance(c.get('music'),dict) else {}
+        m.update(path=it['preview'],dur=round(it['dur'],2),envato=env);c['music']=m;c.pop('music_dur',None)
+    cfgio(W,c);print(f"✓ {key} = {it['title']} (vista previa con marca de agua hasta licenciar) · {it['item_url']}")
+
+def entries(c):
+    for k,b in (c.get('broll') or {}).items():
+        if b.get('envato'): yield k,b
+    if isinstance(c.get('music'),dict) and c['music'].get('envato'): yield 'music',c['music']
+def collect(W,src,manual=None):
+    c=cfgio(W);dst=os.path.join(c['edit_dir'],'Assets','Envato');os.makedirs(dst,exist_ok=True);tmp=os.path.join(W,'envato','_unzip')
+    VID=('.mp4','.mov','.m4v');AUD=('.wav','.aif','.aiff','.mp3','.m4a')
+    for k,b in entries(c):
+        e=b['envato']
+        if e['status']=='licensed' and not manual: continue
+        if manual and manual[0]!=k: continue
+        m=re.search(r'/([a-z0-9-]+)-([A-Z0-9]{6,})/?$',e['url']);base,iid=(norm(m.group(1)),m.group(2).lower()) if m else (norm(e['title']),'#')
+        if manual: found=manual[1]
+        else:
+            cands=[os.path.join(src,f) for f in os.listdir(src) if (base and base in norm(f)) or iid in f.lower()]
+            cands=[p for p in cands if os.path.getmtime(p)>=e.get('chosen',0)-86400*30]
+            if not cands: print(f'… {k}: todavía no está en {src} ({e["title"]})');continue
+            found=max(cands,key=os.path.getmtime)
+        if found.lower().endswith('.zip'):
+            shutil.rmtree(tmp,ignore_errors=True);zipfile.ZipFile(found).extractall(tmp)
+            media=[os.path.join(r,f) for r,_,fs in os.walk(tmp) for f in fs if '__MACOSX' not in r and f.lower().endswith(VID if e['kind']=='video' else AUD)]
+            if e['kind']=='music': media.sort(key=lambda p:(not p.lower().endswith(('.wav','.aif','.aiff')),-os.path.getsize(p)))
+            else: media.sort(key=lambda p:-os.path.getsize(p))
+            if not media: print(f'⚠️ {k}: el zip no trae {"video" if e["kind"]=="video" else "audio"}');continue
+            found=media[0]
+        out=os.path.join(dst,f"{k}_{slug(e['title'])}{os.path.splitext(found)[1].lower()}");shutil.copyfile(found,out);p=probe(out)
+        if e['kind']=='video': b.update(path=out,frames=p['frames'],rate=p['rate'],w=p['w'],h=p['h'])
+        else: b.update(path=out,dur=round(p['dur'],2))
+        e.update(status='licensed',file=out);print(f'✓ {k}: original licenciado → {out}')
+    shutil.rmtree(tmp,ignore_errors=True);cfgio(W,c)
+    pend=[k for k,b in entries(c) if b['envato']['status']!='licensed']
+    print('pendientes:',', '.join(pend) if pend else 'ninguno — volver a correr build_xml.py')
+def report(W):
+    c=cfgio(W);rows=list(entries(c))
+    if not rows: print('Sin material de Envato.');return
+    print('| Clave | Tipo | Título | Autor | Estado | Link |\n|---|---|---|---|---|---|')
+    for k,b in rows:
+        e=b['envato'];print(f"| {k} | {'B-roll' if e['kind']=='video' else 'Música'} | {e['title']} | {e['author']} | {'✅ licenciado' if e['status']=='licensed' else '⚠️ vista previa con marca de agua: falta licenciar'} | {e['url']} |")
+
+if __name__=='__main__':
+    a=sys.argv[1:];t0=time.time()
+    if not a or a[0] in('-h','--help'): print(__doc__);sys.exit()
+    cmd,W=a[0],a[1];o={};pos=[];i=2
+    while i<len(a):
+        if a[i].startswith('--'):
+            if a[i] in('--vertical',): o[a[i][2:]]=True;i+=1
+            elif a[i]=='--file': o['file']=(a[i+1],a[i+2]);i+=3
+            else: o[a[i][2:]]=a[i+1];i+=2
+        else: pos.append(a[i]);i+=1
+    if cmd=='search': search(W,pos[0],pos[1],o)
+    elif cmd=='use': use(W,pos[0],pos[1])
+    elif cmd=='collect': collect(W,os.path.expanduser(o.get('from','~/Downloads')),o.get('file'))
+    elif cmd=='report': report(W)
+    if cmd in('search','collect'): timing.log(W,f'envato {cmd}',time.time()-t0)

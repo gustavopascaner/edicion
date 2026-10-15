@@ -241,8 +241,9 @@
    "anchor_mode": "onset",
    "lufs": -16.0,
    "tp": -10.5,
-   "desc": "Voz robótica 'game over'",
-   "source": "Robot Voice - game over.wav"
+   "desc": "Voz robótica 'game over'. No entra en la rotación de \"error\": pedirlo por id.",
+   "source": "Robot Voice - game over.wav",
+   "rotate": false
   },
   "wrong": {
    "cat": "error",

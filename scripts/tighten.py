@@ -9,6 +9,7 @@ Umbrales automáticos según el piso de ruido de la grabación.
 import wave,struct,math,json,subprocess,os,sys
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav')
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Corte ajustado',time.time()-_t0))
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
 HOP=0.01;N=int(SR*HOP)
 def db(i):

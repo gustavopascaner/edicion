@@ -6,6 +6,7 @@ Habla ≈ -5..-25 dB; ruido de fondo ≈ -48..-70 dB. Si Whisper dice "Gracias" 
 import sys,os,subprocess,wave,struct,math
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav');T=os.path.join(W,'t.wav')
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Verificación de audio',time.time()-_t0))
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
 def env(a,b,st=0.1):
     out=[];t=a

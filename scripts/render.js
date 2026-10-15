@@ -31,29 +31,106 @@ function pick(spec){
   const ids=rotating.length?rotating:all;if(!ids.length&&CAT.sounds[spec])return spec;
   if(!ids.length)throw new Error(`SFX "${spec}" no existe (ni categoría ni id). Ver: python3 -I scripts/sfx_import.py --list`);
   let k=(rot[spec]=(rot[spec]??-1)+1)%ids.length;if(ids.length>1&&ids[k]===last.id)k=(k+1)%ids.length;return ids[k];}
-// S(spec, segundo del evento, {gain, dur, at}) → pone un sonido de la librería en la línea de tiempo
-const missing=new Set();
-function S(spec,t,o={}){const id=pick(spec),m=CAT.sounds[id];last.id=id;
-  if(!fs.existsSync(path.join(SFXDIR,m.file))){if(!missing.size)console.warn('⚠️  Faltan sonidos de la librería (instalar edicion-sfx.zip, ver README). Se omiten:');
-    if(!missing.has(id)){missing.add(id);console.warn('   ',id);}return;}
-  let start=t-m.anchor,sin=0;if(start<0){sin=-start;start=0;}
-  const dur=Math.min(o.dur||m.dur,m.dur-sin);if(dur<=0.02)return;
-  sfx.push({id,file:m.file,start:+start.toFixed(3),sin:+sin.toFixed(3),dur:+dur.toFixed(3),fdur:m.dur,gain:o.gain??CAT.categories[m.cat].gain,at:+t.toFixed(3)});}
+// S(spec, segundo del evento, {gain, dur}) → pone un sonido de la librería en la línea de tiempo (manual: nunca se descarta)
+const ev=[];
+function S(spec,t,o={}){ev.push({spec,t,o,manual:true});}
 // J(id, escena, pista: 'ov'|'ov2'|'fs', inicio, fin, params, sfx)
-//   sfx: 'pop' · 'whoosh' · 'ding' · id… | ['whoosh',['pop',0.8],['ding',1.6,{gain:.3}]] (segundos desde el inicio del gráfico) | null
-function J(id,scene,track,start,end,p,cue){jobs.push({id,scene,track,start:+start.toFixed(3),end:+end.toFixed(3),p:p||{},sfx:cue||null});
-  if(!cue)return;const tuple=Array.isArray(cue)&&typeof cue[1]==='number';const list=Array.isArray(cue)&&!tuple?cue:[cue];
+//   sfx omitido → DISEÑO SONORO AUTOMÁTICO (según la escena y sus tiempos internos: ítems, sellos, clicks…)
+//   'pop' · 'whoosh' · id… | ['whoosh',['pop',0.8],['ding',1.6,{gain:.3}]] (segundos desde el inicio) → manual · null → sin sonido
+function J(id,scene,track,start,end,p,cue){jobs.push({id,scene,track,start:+start.toFixed(3),end:+end.toFixed(3),p:p||{},sfx:cue===undefined?'auto':cue});
+  if(cue===undefined||cue==='auto'||!cue)return;const tuple=Array.isArray(cue)&&typeof cue[1]==='number';const list=Array.isArray(cue)&&!tuple?cue:[cue];
   for(const c of list){const [spec,at=0,o={}]=Array.isArray(c)?c:[c];S(spec,start+at,o);}}
+// F(seg, modo) → encuadre de todos los clips de ese segmento · F.clip(i, modo). Modos: wide · push · tight · punch · snap · pull
+const framingOverride={};
+function F(seg,mode){SG(seg).forEach(c=>framingOverride[c.i]=mode);} F.clip=(i,mode)=>framingOverride[i]=mode;
 // B(clave de config.broll, segundo de origen, inicio en timeline, duración, [zoomInicio%, zoomFin%] para fotos)
 function B(src,sin,start,dur,kb){broll.push({src,sin:+sin.toFixed(3),start:+start.toFixed(3),dur:+dur.toFixed(3),kb:kb||null});}
 // X(archivo de audio absoluto, inicio, duración, ganancia lineal, segundo de origen)
 function X(file,start,dur,gain,sin=0){extraSfx.push({file,start:+start.toFixed(3),dur:+dur.toFixed(3),gain,sin});}
-require(path.join(WD,'jobs.js'))({J,B,X,S,W,C,CE,R,H,SG,edl,cfg,FPS});
+require(path.join(WD,'jobs.js'))({J,B,X,S,F,W,C,CE,R,H,SG,edl,cfg,FPS});
+const userJobs=jobs.slice();
 // subtítulos: un clip por clip de V1
 const KW=new Set((cfg.keywords||[]).map(norm));
 edl.clips.forEach((c,i)=>{const s=c.tl_in/FPS,e=c.tl_out/FPS;
   const groups=edl.caps.filter(g=>g.clip===i).map(g=>({s:R(s,g.tl_in/FPS),e:R(s,g.tl_out/FPS),words:g.words.map(w=>({w:w.w.replace(/[¿?:]/g,'').replace(/,$/,''),s:R(s,w.s/FPS),e:R(s,w.e/FPS),k:KW.has(norm(w.w))}))}));
   J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups});});
+
+// ───── DISEÑO SONORO AUTOMÁTICO ─────
+// Cada escena dispara sonidos en sus momentos internos (segundos locales). Luego se raleán por prioridad y densidad.
+const A=(spec,at)=>at==null||isNaN(at)?null:[spec,+at];
+const each=(arr,f)=>(arr||[]).map(f);
+const AUTO={
+  listCard:p=>[['pop',0],...(p.items||[]).flatMap(it=>[A(it.mark==='check'?'ding':it.mark==='x'?'error':'pop',it.at),A('error',it.strikeAt)])],
+  textcard:p=>[['pop',0],...each(p.lines,(l,k)=>/--hot|class="hl/.test(l)&&p.at?A('pop',p.at[k]):null)],
+  target:p=>[['pop',0],A('pop',p.qAt)], search:p=>[['pop',0],A('click',p.typeAt),A('click',p.pickAt)], choice:p=>[['pop',0],A('click',p.pickAt)],
+  flow:p=>each(p.nodes,n=>A('pop',n.at)), loop:p=>each(p.nodes,n=>A('pop',n.at)), excuses:p=>[['pop',0],...each(p.items,n=>A('pop',n.at))],
+  algo:p=>[['pop',0],A('hit',p.stampAt)], check10:p=>[['pop',0],A('ding',p.tickAt),A('ding',p.goalAt)], scroll:p=>[['pop',0],A('hit',p.stopAt)],
+  hook:p=>[['whoosh',0],...each(p.tagAt,t=>A('pop',t)),A('hit',p.bigAt)], stat:p=>[['pop',0],A('ding',p.countEnd)], stamp:p=>[A('hit',p.at??0)],
+  hud:p=>[['glitch',0],A('click',p.labAt)], pensas:p=>[...each(p.at,t=>A('pop',t)),A('hit',p.noAt)], tracker:()=>[],
+  dm:p=>[['pop',0],A('pop',p.replyAt)], follow:p=>[['pop',0],A('click',p.clickAt)], comment:p=>[['pop',0],A('click',p.typeAt),A('click',p.sendAt)],
+  book:p=>[['pop',0],A('click',p.btnAt),A('hit',p.stampAt)],
+  fsTitle:p=>[['whoosh',0],p.marks?A('error',p.marksAt):null], bigword:()=>[['hit',0]], counter:p=>[['whoosh',0],A('error',p.strikeAt)],
+  metrics:p=>[['whoosh',0],...each(p.tiles,t=>A('pop',t.at)),A('hit',p.stampAt)], calendar:p=>[['whoosh',0],A('pop',p.qAt)],
+};
+const PRIO={hit:5,build:5,whoosh:4,foley:4,splash:4,car:4,error:3,ding:3,glitch:3,poof:3,zoom:3,wind:3,click:2,bounce:2,pop:1};
+const catOf=spec=>CAT.categories[spec]?spec:(CAT.sounds[spec]||{}).cat;
+if(cfg.sound_design!=='manual'){
+  for(const j of userJobs){if(j.sfx!=='auto'||j.track==='cap')continue;
+    const rule=AUTO[j.scene]||(j.track==='fs'?()=>[['whoosh',0]]:()=>[['pop',0]]);
+    for(const e of rule(j.p).filter(Boolean))if(e[1]>=0&&e[1]<j.end-j.start-0.15)ev.push({spec:e[0],t:j.start+e[1],o:{}});}
+  // build antes del remate más fuerte (primer bigword/stamp a pantalla completa)
+  const big=userJobs.find(j=>j.track==='fs'&&/bigword|stamp/.test(j.scene));if(big&&big.start>2)ev.push({spec:'reverse-whoosh',t:big.start,o:{},pre:true});
+  // corte a b-roll
+  for(const b of broll)ev.push({spec:'whoosh',t:b.start,o:{gain:.25},prioAdj:-2});}
+// raleo: manuales siempre; automáticos por prioridad, con ≥ 0,35 s entre sonidos y ≤ 3 sonidos cada 2 s
+const GAP=cfg.sfx_gap??0.35,kept=[];
+for(const e of ev)e.prio=(e.manual?10:PRIO[catOf(e.spec)]||1)+(e.prioAdj||0);
+for(const e of ev.slice().sort((a,b)=>b.prio-a.prio||a.t-b.t)){
+  if(!e.manual&&!e.pre){const near=kept.filter(k=>!k.pre&&Math.abs(k.t-e.t)<1);
+    if(near.some(k=>Math.abs(k.t-e.t)<GAP)||near.length>=3)continue;}
+  kept.push(e);}
+// presupuesto: ≤ cfg.sfx_per_10s sonidos cada 10 s (default 4). Sobran → se sacan los automáticos de menor prioridad más amontonados
+const budget=Math.round((cfg.sfx_per_10s??4)*edl.total/FPS/10);kept.sort((a,b)=>a.t-b.t);
+while(kept.length>budget){const cand=kept.map((e,k)=>({e,k,g:Math.min(k?e.t-kept[k-1].t:99,k<kept.length-1?kept[k+1].t-e.t:99)})).filter(x=>!x.e.manual&&!x.e.pre);
+  if(!cand.length)break;const lo=Math.min(...cand.map(x=>x.e.prio));const v=cand.filter(x=>x.e.prio===lo).sort((a,b)=>a.g-b.g)[0];kept.splice(v.k,1);}
+const missing=new Set();
+for(const e of kept){const id=pick(e.spec),m=CAT.sounds[id];last.id=id;
+  if(!fs.existsSync(path.join(SFXDIR,m.file))){if(!missing.size)console.warn('⚠️  Faltan sonidos de la librería (instalar edicion-sfx.zip, ver README). Se omiten:');
+    if(!missing.has(id)){missing.add(id);console.warn('   ',id);}continue;}
+  let start=e.t-m.anchor,sin=0;if(start<0){sin=-start;start=0;}
+  const dur=Math.min(e.o.dur||m.dur,m.dur-sin);if(dur<=0.02)continue;
+  sfx.push({id,cat:m.cat,file:m.file,start:+start.toFixed(3),sin:+sin.toFixed(3),dur:+dur.toFixed(3),fdur:m.dur,gain:e.o.gain??CAT.categories[m.cat].gain,at:+e.t.toFixed(3),auto:!e.manual});}
+
+// ───── REENCUADRES (V1) ─────
+// Escala por clip según la intención: punch = énfasis · snap = zoom rápido de entrada · push = acercamiento lento (preguntas, cierre)
+// tight/wide alternados para disimular los jump cuts (≥ 10 % de diferencia entre clips seguidos).
+// cfg.face.top = alto (0–1) de la parte de arriba de la cabeza en el cuadro: limita el zoom para no cortarla
+const MAXS=cfg.max_zoom||(cfg.face&&cfg.face.top!=null?Math.min(1.3,0.47/(0.5-cfg.face.top)):1.24);
+const MODES={wide:[100,103],push:[100,109],tight:[114,114],punch:[124,124],snap:[100,118],pull:[114,102]};
+const cover=(a,b)=>userJobs.some(j=>j.track==='fs'&&j.start<=a+0.05&&j.end>=b-0.05)||broll.some(x=>x.start<=a+0.05&&x.start+x.dur>=b-0.05);
+const strong=(a,b)=>userJobs.some(j=>/stamp|bigword/.test(j.scene)&&j.start<b&&j.end>a);
+const framing=[];let lastPunch=-99,prev=null;
+edl.clips.forEach((c,i)=>{const a=c.tl_in/FPS,b=c.tl_out/FPS,txt=c.text||'';let m;
+  const kw=(txt.split(/\s+/)).some(w=>KW.has(norm(w)));
+  if(framingOverride[i])m=framingOverride[i];
+  else if(cover(a,b))m='wide';
+  else if(i===0)m='snap';
+  else if(i===edl.clips.length-1)m='push';
+  else if((/!$/.test(txt.trim())||strong(a,b)||(kw&&b-a<2.5))&&a-lastPunch>6&&prev!=='punch')m='punch';
+  else if(/\?$/.test(txt.trim()))m='push';
+  else m=(prev==='wide'||prev==='push'||prev==='snap'||prev==='pull')?'tight':'wide';
+  if(m===prev&&m!=='wide'&&!framingOverride[i])m=m==='tight'?'wide':'tight';
+  const cap=v=>Math.min(v,Math.round(MAXS*100));let [s0,s1]=(MODES[m]||MODES.wide).map(cap);
+  const pe=framing.length?framing[framing.length-1].s1:null;
+  if(pe!=null&&Math.abs(pe-s0)<8&&!framingOverride[i]){   // jump cut: forzar un cambio de escala visible
+    if(m==='wide'||m==='tight'){m=m==='wide'?'tight':'wide';[s0,s1]=MODES[m].map(cap);}
+    else if(m==='push'){[s0,s1]=pe<108?[cap(112),cap(120)]:[100,108];}
+    if(Math.abs(pe-s0)<8){[s0,s1]=pe>=108?[100,103]:[cap(114),cap(114)];m=pe>=108?'wide':'tight';}}
+  if(m==='punch')lastPunch=a;
+  framing.push({i,mode:m,s0,s1,ramp:m==='snap'?0.25:null,tl_in:c.tl_in,tl_out:c.tl_out});prev=m;});
+if(framing[0]&&framing[0].mode==='snap'&&cfg.sound_design!=='manual'&&!sfx.some(x=>x.at<0.4))S0('zoom',0.02);
+function S0(spec,t){const id=pick(spec),m=CAT.sounds[id];if(fs.existsSync(path.join(SFXDIR,m.file)))sfx.push({id,cat:m.cat,file:m.file,start:Math.max(0,+(t-m.anchor).toFixed(3)),sin:+Math.max(0,m.anchor-t).toFixed(3),dur:+(m.dur-Math.max(0,m.anchor-t)).toFixed(3),fdur:m.dur,gain:.25,at:t,auto:true});}
+fs.writeFileSync(path.join(WD,'framing.json'),JSON.stringify(framing,null,1));
 fs.writeFileSync(path.join(WD,'jobs.json'),JSON.stringify(jobs,null,1));
 fs.writeFileSync(path.join(WD,'broll.json'),JSON.stringify({broll,extraSfx},null,1));
 fs.writeFileSync(path.join(WD,'sfx.json'),JSON.stringify(sfx.sort((a,b)=>a.start-b.start),null,1));
@@ -88,5 +165,7 @@ async function main(){
   await Promise.all(Array.from({length:par},worker));await browser.close();
 }
 if(process.argv.includes('--plan')){console.log(jobs.filter(j=>j.track!=='cap').map(j=>`${j.id.padEnd(24)} ${j.track.padEnd(4)} ${j.start.toFixed(2)}-${j.end.toFixed(2)}`).join('\n'));console.log(JSON.stringify(broll));
-  console.log('SFX:\n'+sfx.map(x=>`  ${x.at.toFixed(2).padStart(6)}  ${x.id.padEnd(16)} gain ${x.gain}`).join('\n'));}
-else main().catch(e=>{console.error(e);process.exit(1)});
+  console.log('SFX:\n'+sfx.map(x=>`  ${x.at.toFixed(2).padStart(6)}  ${x.id.padEnd(16)} gain ${x.gain}${x.auto?'  (auto)':''}`).join('\n'));
+  console.log('Encuadres: '+framing.map(f=>`${f.i}:${f.mode}`).join(' '));}
+else{const t0=Date.now();main().then(()=>{const lab=process.argv.includes('--test')?'Render de prueba':process.argv.some(a=>a.includes('cap'))&&!process.argv.some(a=>a.includes('?!cap'))?'Render de subtítulos':'Render de motion graphics';
+  require('child_process').spawnSync('python3',['-I','-c',`import sys;sys.path.insert(0,${JSON.stringify(__dirname)});import timing;timing.log(${JSON.stringify(WD)},${JSON.stringify(lab)},${(Date.now()-t0)/1000})`]);}).catch(e=>{console.error(e);process.exit(1)});}

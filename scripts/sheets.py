@@ -5,6 +5,7 @@ uso: python3 -I sheets.py <workdir>     (usa <workdir>/bg.png; lo extrae del cru
 """
 import os,sys,subprocess,glob,json
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Hojas de prueba',time.time()-_t0))
 bg=os.path.join(W,'bg.png')
 if not os.path.exists(bg): subprocess.run(['ffmpeg','-v','error','-y','-ss','20','-i',cfg['src'],'-frames:v','1','-vf','scale=1080:1920',bg])
 dst=os.path.join(W,'sheets');os.makedirs(dst,exist_ok=True)

@@ -8,6 +8,7 @@ verificar esas zonas con check.py antes de decidir.
 import re,subprocess,json,sys,os
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 src,W=sys.argv[1],sys.argv[2];os.makedirs(os.path.join(W,'sub'),exist_ok=True)
+import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Transcripción',time.time()-_t0))
 A=os.path.join(W,'audio16k.wav')
 if not os.path.exists(A):
     subprocess.run(['ffmpeg','-v','error','-y','-i',src,'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',A],check=True)

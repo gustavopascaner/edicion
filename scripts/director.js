@@ -26,7 +26,12 @@ if(B.length>=2){const s=B.map(b=>b.start).sort((a,b)=>a-b);if(s[s.length-1]-s[0]
 for(const f of fsj){const d=f.end-f.start;if(d<0.8||d>3.6)W(`Pantalla completa ${f.id} dura ${f2(d)}: ideal 1–3 s.`);}
 const fss=fsj.map(f=>f.start).sort((a,b)=>a-b);
 for(let i=1;i<fss.length;i++)if(fss[i]-fss[i-1]<6)W(`Pantallas completas muy seguidas (${f2(fss[i-1])} y ${f2(fss[i])}): espaciarlas ≥ 6 s.`);
-if(T>20&&!fsj.length)W('No hay ninguna pantalla completa: sumar 1 remate fuerte cada 10–15 s.');
+const FSM=cfg.fs_max??3,MGM=cfg.mg_max??3,nOv=ov.length+ov2.length;
+(fsj.length>FSM?W:O)(`Pantallas completas: ${fsj.length} (objetivo ${FSM})${fsj.length>FSM?' — sobran: quedarse con los remates más fuertes':''}.`);
+if(T>25&&fsj.length<FSM)W(`Hay ${fsj.length} pantallas completas: el estilo usa ${FSM} (los remates más fuertes, repartidos).`);
+(nOv>MGM?W:O)(`Motion graphics superpuestos: ${nOv} (máximo ${MGM})${nOv>MGM?' — sobran: dejar solo los que más suman y que el resto lo cuenten los subtítulos':''}.`);
+const capOver=caps.flatMap(c=>(c.p.groups||[]).map(g=>({start:c.start+g.s,end:c.start+g.e}))).filter(g=>[...ov,...ov2,...fsj].some(j=>ovl(g,j)>0.05));
+(capOver.length?W:O)(capOver.length?`Subtítulos visibles debajo de un motion graphic en ${capOver.map(g=>f2(g.start)).join(', ')}: volver a correr render.js.`:'Subtítulos ocultos mientras hay motion graphics: no compiten.');
 // cara visible y "aire"
 const step=0.1;let face=0,clean=0,idle=0,maxIdle=0,idleAt=0;
 const evs=[...jobs.filter(j=>j.track!=='cap').map(j=>j.start),...B.map(b=>b.start),...framing.filter(f=>/punch|snap/.test(f.mode)).map(f=>f.tl_in/FPS)].sort((a,b)=>a-b);
@@ -36,7 +41,7 @@ for(let i=0;i<=evs.length;i++){const a=i?evs[i-1]:0,b=i<evs.length?evs[i]:T;if(b
 const pf=face/T*100,pc=clean/T*100;
 (pf<55?W:O)(`Cara a cámara visible el ${pf.toFixed(0)}% del video${pf<55?' (poca: la persona tiene que sostener el video, objetivo ≥ 55%)':''}.`);
 (pc<5?W:O)(`Cara sin ningún gráfico encima: ${pc.toFixed(0)}%${pc<5?' (muy cargado: dejar respirar 1–2 tramos cortos, por ejemplo justo después de un remate)':''}.`);
-(maxIdle>12?W:O)(`Tramo más largo sin ningún evento visual: ${f2(maxIdle)} desde ${f2(idleAt)}${maxIdle>12?' (se vuelve monótono: sumar tarjeta, punch-in o b-roll)':''}.`);
+(maxIdle>15?W:O)(`Tramo más largo sin ningún evento visual: ${f2(maxIdle)} desde ${f2(idleAt)}${maxIdle>15?' (se vuelve monótono: sumar un punch-in o un b-roll)':''}.`);
 if(!evs.length||evs[0]>1.0)W('Nada visual en el primer segundo: el gancho necesita texto o movimiento desde el arranque.');
 // ── Sonido ──
 const hits=sfx.filter(x=>x.cat==='hit');for(let i=1;i<hits.length;i++)if(hits[i].at-hits[i-1].at<4)W(`Dos golpes (hit) a menos de 4 s (${f2(hits[i-1].at)} y ${f2(hits[i].at)}): pierden fuerza.`);

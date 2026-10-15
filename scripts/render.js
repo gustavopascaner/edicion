@@ -51,9 +51,24 @@ require(path.join(WD,'jobs.js'))({J,B,X,S,F,W,C,CE,R,H,SG,edl,cfg,FPS});
 const userJobs=jobs.slice();
 // subtítulos: un clip por clip de V1
 const KW=new Set((cfg.keywords||[]).map(norm));
-edl.clips.forEach((c,i)=>{const s=c.tl_in/FPS,e=c.tl_out/FPS;
-  const groups=edl.caps.filter(g=>g.clip===i).map(g=>({s:R(s,g.tl_in/FPS),e:R(s,g.tl_out/FPS),words:g.words.map(w=>({w:w.w.replace(/[¿?:]/g,'').replace(/,$/,''),s:R(s,w.s/FPS),e:R(s,w.e/FPS),k:KW.has(norm(w.w))}))}));
-  J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups});});
+// Los subtítulos corren todo el tiempo, PERO desaparecen mientras hay un motion graphic (ov, ov2 o pantalla completa):
+// las palabras que caen dentro de un MG no se muestran (el MG ya cuenta esa idea) y vuelven apenas sale.
+const MGW=userJobs.filter(j=>j.track!=='cap').map(j=>[j.start-0.08,j.end+0.1]);
+const inMG=(a,b)=>MGW.some(([x,y])=>a<y&&b>x),nextMG=t=>Math.min(...MGW.filter(([x])=>x>=t).map(([x])=>x),1e9);
+let capHidden=0;
+edl.clips.forEach((c,i)=>{const s=c.tl_in/FPS,e=c.tl_out/FPS,groups=[];
+  for(const g of edl.caps.filter(g=>g.clip===i)){
+    const ws=g.words.map(w=>({w:w.w.replace(/[¿?:]/g,'').replace(/,$/,''),gs:w.s/FPS,ge:w.e/FPS,k:KW.has(norm(w.w))}));let run=[];
+    const flush=(last)=>{if(!run.length)return;const a=run[0]===ws[0]?g.tl_in/FPS:run[0].gs;
+      const b=Math.min(last?g.tl_out/FPS:run[run.length-1].ge+0.12,nextMG(run[0].gs));
+      groups.push({s:R(s,a),e:R(s,b),words:run.map(w=>({w:w.w,s:R(s,w.gs),e:R(s,w.ge),k:w.k}))});run=[];};
+    ws.forEach((w,k)=>{if(inMG(w.gs,w.ge)){flush(false);capHidden++;}else run.push(w);});flush(true);}
+  if(groups.length)J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups});});
+if(capHidden)console.log(`subtítulos: ${capHidden} palabras ocultas bajo motion graphics`);
+// Límite del usuario: 3 pantallas completas y como máximo 3 motion graphics superpuestos (ov/ov2) en toda la edición
+{const nFs=userJobs.filter(j=>j.track==='fs').length,nOv=userJobs.filter(j=>j.track==='ov'||j.track==='ov2').length;
+ if(nOv>(cfg.mg_max??3))console.warn(`⚠️  Hay ${nOv} motion graphics superpuestos: el máximo es ${cfg.mg_max??3}. Elegir los más fuertes.`);
+ if(nFs>(cfg.fs_max??3))console.warn(`⚠️  Hay ${nFs} pantallas completas: el máximo es ${cfg.fs_max??3}.`);}
 
 // ───── DISEÑO SONORO AUTOMÁTICO ─────
 // Cada escena dispara sonidos en sus momentos internos (segundos locales). Luego se raleán por prioridad y densidad.

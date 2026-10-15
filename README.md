@@ -4,7 +4,7 @@ Edita un video crudo vertical (talking head) con corte ajustado sin pausas, moti
 
 Qué hace:
 - **Corte ajustado**: saca pausas, tomas falladas y repeticiones, y verifica el corte re-transcribiéndolo.
-- **Motion graphics** con alfa (tarjetas, listas, sellos, pantallas completas) sincronizados con las palabras, y **subtítulos dinámicos**.
+- **Motion graphics** con alfa sincronizados con las palabras: 3 pantallas completas y como máximo 3 gráficos superpuestos. **Subtítulos dinámicos** todo el tiempo, que se ocultan solos mientras hay un motion graphic para no competir.
 - **B-roll semántico y música de Envato**: elige 3 momentos, busca con el MCP de Envato, ubica las vistas previas y las reemplaza por los originales licenciados.
 - **Diseño sonoro sutil** con la librería de SFX: como máximo 5 efectos en toda la edición, en los momentos más importantes (remates, gancho, CTA, cortes).
 - **Reencuadres y zooms** según la intención de cada frase (snap en el gancho, punch-in en el énfasis, alternancia para disimular jump cuts).

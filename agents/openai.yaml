@@ -1,0 +1,7 @@
+interface:
+  display_name: "Edición con motion graphics"
+  short_description: "Corte ajustado, motion graphics, subtítulos y SFX → XML para Premiere"
+  default_prompt: "Usá $edicion para editar el video crudo de esta carpeta y entregar el XML para Premiere."
+
+policy:
+  allow_implicit_invocation: true

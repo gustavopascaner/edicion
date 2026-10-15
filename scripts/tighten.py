@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Paso 2: corte AJUSTADO. Lee <workdir>/segs.json y recorta cada frase sobre la energía real de la voz,
+partiendo en pausas internas >= 0.25s (lecturas, miradas al costado, respiraciones).
+segs.json = lista de SEGMENTOS lógicos; cada segmento = lista de [a, b, "texto corregido para subtítulos"].
+  Un segmento agrupa frases que comparten un gráfico (los MG se sincronizan por índice de segmento).
+uso: python3 -I tighten.py <workdir>      → <workdir>/tight.json
+Umbrales automáticos según el piso de ruido de la grabación.
+"""
+import wave,struct,math,json,subprocess,os,sys
+MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
+W=sys.argv[1];A=os.path.join(W,'audio16k.wav')
+w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
+HOP=0.01;N=int(SR*HOP)
+def db(i):
+    seg=S[i*N:i*N+2*N]
+    if not seg: return -99
+    return 20*math.log10(max(1,math.sqrt(sum(x*x for x in seg)/len(seg)))/32768)
+ENV=[db(i) for i in range(len(S)//N)]
+FLOOR=sorted(ENV)[len(ENV)//10]
+TH=-32; GAP=0.25; ATT=max(FLOOR+10,-46); DEC=max(FLOOR+12,-42)
+print(f'piso de ruido {FLOOR:.0f} dB · umbral voz {TH} · ataque {ATT:.0f} · cola {DEC:.0f}')
+SEG=json.load(open(os.path.join(W,'segs.json')))
+def regions(a,b):
+    i0=max(0,int((a-0.15)/HOP));i1=min(len(ENV)-1,int((b+0.15)/HOP))
+    regs=[];st=None
+    for k in range(i0,i1+1):
+        v=ENV[k]>TH;t=k*HOP
+        if v and st is None: st=t
+        if not v and st is not None: regs.append([st,t]);st=None
+    if st is not None: regs.append([st,(i1+1)*HOP])
+    regs=[r for r in regs if r[1]-r[0]>=0.04]
+    merged=[]
+    for r in regs:
+        if merged and r[0]-merged[-1][1]<GAP: merged[-1][1]=r[1]
+        else: merged.append(r)
+    merged=[r for r in merged if r[1]-r[0]>=0.12]
+    for r in merged:
+        i=int(r[0]/HOP);k=0
+        while k<15 and ENV[i-1]>ATT: i-=1;k+=1
+        r[0]=i*HOP
+        j=int(r[1]/HOP);k=0
+        while k<20 and j<len(ENV) and ENV[j]>DEC: j+=1;k+=1
+        r[1]=j*HOP
+    return merged
+def heard(a,b,prompt):
+    f=os.path.join(W,'t.wav');subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.05)),'-to',str(b+0.05),'-i',A,f])
+    return subprocess.run(['whisper-cli','-m',MODEL,'-f',f,'-l','es','-np','-nt','--prompt',prompt],capture_output=True,text=True).stdout.strip().replace('\n',' ')
+out=[]
+for si,seg in enumerate(SEG):
+    for (a,b,txt) in seg:
+        rs=regions(a,b);words=txt.split()
+        if not rs: print('!! sin voz detectada en',a,b,txt);continue
+        if len(rs)==1: out.append(dict(seg=si,a=round(rs[0][0],3),b=round(rs[0][1],3),t=txt));continue
+        hs=[heard(r[0],r[1],txt) for r in rs];cnt=[len(x.split()) for x in hs];tot=sum(cnt) or 1;k=0
+        for j,r in enumerate(rs):
+            n=len(words)-k if j==len(rs)-1 else min(len(words)-k,max(0,round(len(words)*cnt[j]/tot)))
+            out.append(dict(seg=si,a=round(r[0],3),b=round(r[1],3),t=' '.join(words[k:k+n])));k+=n
+for p in out: print(f"{p['seg']:02d} {p['a']:7.2f}-{p['b']:7.2f} ({p['b']-p['a']:.2f}) {p['t']}")
+json.dump(out,open(os.path.join(W,'tight.json'),'w'),ensure_ascii=False,indent=1)

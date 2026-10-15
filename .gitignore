@@ -1,0 +1,6 @@
+engine/node_modules/
+assets/sfx/.tmp.wav
+.DS_Store
+__pycache__/
+# Los sonidos no se publican (licencias de terceros): se instalan desde edicion-sfx.zip
+assets/sfx/**/*.wav

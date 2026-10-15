@@ -1,0 +1,526 @@
+{
+ "target_lufs": -16.0,
+ "categories": {
+  "whoosh": {
+   "gain": 0.35,
+   "auto": true,
+   "desc": "Transiciones: entrada de pantallas completas, wipes, cambios de tarjeta. Se alternan."
+  },
+  "build": {
+   "gain": 0.4,
+   "auto": true,
+   "desc": "Crece hasta el evento (reverse-whoosh antes de un corte; riser antes de un gran remate)."
+  },
+  "zoom": {
+   "gain": 0.35,
+   "auto": true,
+   "desc": "Punch-in, lupa, acercar la atención."
+  },
+  "wind": {
+   "gain": 0.3,
+   "auto": true,
+   "desc": "Aparición especial/mágica, revelación suave."
+  },
+  "pop": {
+   "gain": 0.4,
+   "auto": true,
+   "desc": "Aparición de tarjetas, stickers, ítems de lista."
+  },
+  "click": {
+   "gain": 0.45,
+   "auto": true,
+   "desc": "Interfaces: botones, búsquedas, DMs, seguir, tildar."
+  },
+  "bounce": {
+   "gain": 0.35,
+   "auto": true,
+   "desc": "Elementos que rebotan, tono de humor."
+  },
+  "hit": {
+   "gain": 0.45,
+   "auto": true,
+   "desc": "Remates fuertes, sellos, pantallas completas de impacto. bass-drop solo para el remate más fuerte."
+  },
+  "ding": {
+   "gain": 0.35,
+   "auto": true,
+   "desc": "Check ✓, acierto, idea, dato positivo."
+  },
+  "error": {
+   "gain": 0.4,
+   "auto": true,
+   "desc": "Tachar, ✗, lo que está mal, mito."
+  },
+  "glitch": {
+   "gain": 0.35,
+   "auto": true,
+   "desc": "Algo que falla, se rompe o desaparece; tono tech."
+  },
+  "poof": {
+   "gain": 0.4,
+   "auto": true,
+   "desc": "Algo que desaparece en el aire."
+  },
+  "foley": {
+   "gain": 0.35,
+   "auto": false,
+   "desc": "Literales: solo cuando lo que se dice/ve coincide (escribir, cierre, estirar, inodoro)."
+  },
+  "splash": {
+   "gain": 0.35,
+   "auto": false,
+   "desc": "Literales: agua, salpicar, caer en algo."
+  },
+  "car": {
+   "gain": 0.3,
+   "auto": false,
+   "desc": "Literales: autos, arrancar, pasar de largo."
+  }
+ },
+ "sounds": {
+  "bounce-1": {
+   "cat": "bounce",
+   "file": "bounce/bounce-1.wav",
+   "dur": 1.334,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -3.5,
+   "desc": "Rebote de dibujo animado",
+   "source": "cartoon-bounce-01.wav"
+  },
+  "bounce-2": {
+   "cat": "bounce",
+   "file": "bounce/bounce-2.wav",
+   "dur": 1.43,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -1.8,
+   "desc": "Rebote de dibujo animado",
+   "source": "cartoon-bounce-02.wav"
+  },
+  "reverse-whoosh": {
+   "cat": "build",
+   "file": "build/reverse-whoosh.wav",
+   "dur": 2.368,
+   "anchor": 1.57,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -2.5,
+   "desc": "Whoosh invertido que crece hasta el corte (entra antes del evento)",
+   "source": "Subtle Reverse Whoosh 5.wav"
+  },
+  "riser": {
+   "cat": "build",
+   "file": "build/riser.wav",
+   "dur": 6.744,
+   "anchor": 6.078,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.2,
+   "desc": "Riser cinematográfico de ~6 s que explota en el evento. No entra en la rotación de \"build\": pedirlo por id.",
+   "source": "Cinematic Riser.wav",
+   "rotate": false
+  },
+  "car-ignition": {
+   "cat": "car",
+   "file": "car/car-ignition.wav",
+   "dur": 3.652,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -17.3,
+   "tp": -1.0,
+   "desc": "Arranque de auto viejo (arrancar, poner en marcha)",
+   "source": "06073 old car ignition.wav"
+  },
+  "car-pass-1": {
+   "cat": "car",
+   "file": "car/car-pass-1.wav",
+   "dur": 5.964,
+   "anchor": 2.791,
+   "anchor_mode": "peak",
+   "lufs": -16.2,
+   "tp": -1.0,
+   "desc": "Auto pasando (pico = cuando pasa)",
+   "source": "VEHBy_Car Pass By on Road_01.wav"
+  },
+  "car-pass-2": {
+   "cat": "car",
+   "file": "car/car-pass-2.wav",
+   "dur": 8.608,
+   "anchor": 3.946,
+   "anchor_mode": "peak",
+   "lufs": -17.0,
+   "tp": -1.0,
+   "desc": "Auto pasando",
+   "source": "VEHBy_Car Pass By on Road_02.wav"
+  },
+  "car-pass-3": {
+   "cat": "car",
+   "file": "car/car-pass-3.wav",
+   "dur": 5.472,
+   "anchor": 2.579,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -1.1,
+   "desc": "Auto pasando",
+   "source": "VEHBy_Car Pass By on Road_03.wav"
+  },
+  "car-pass-4": {
+   "cat": "car",
+   "file": "car/car-pass-4.wav",
+   "dur": 10.233,
+   "anchor": 4.496,
+   "anchor_mode": "peak",
+   "lufs": -16.5,
+   "tp": -1.0,
+   "desc": "Auto pasando, más largo",
+   "source": "VEHBy_Car Pass By on Road_04.wav"
+  },
+  "car-pass-5": {
+   "cat": "car",
+   "file": "car/car-pass-5.wav",
+   "dur": 8.761,
+   "anchor": 4.013,
+   "anchor_mode": "peak",
+   "lufs": -17.1,
+   "tp": -1.0,
+   "desc": "Auto pasando",
+   "source": "VEHBy_Car Pass By on Road_05.wav"
+  },
+  "cartoon-car": {
+   "cat": "car",
+   "file": "car/cartoon-car.wav",
+   "dur": 2.804,
+   "anchor": 1.379,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.2,
+   "desc": "Auto de dibujo animado pasando",
+   "source": "CartoonAuto_DIGIP05-36-01.wav"
+  },
+  "click-1": {
+   "cat": "click",
+   "file": "click/click-1.wav",
+   "dur": 0.52,
+   "anchor": 0.067,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.2,
+   "desc": "Click de mouse/botón",
+   "source": "Click.wav"
+  },
+  "click-digital": {
+   "cat": "click",
+   "file": "click/click-digital.wav",
+   "dur": 0.521,
+   "anchor": 0.184,
+   "anchor_mode": "peak",
+   "lufs": -17.0,
+   "tp": -1.0,
+   "desc": "Click digital, interfaz/app",
+   "source": "Click Digital Bot.wav"
+  },
+  "ding-1": {
+   "cat": "ding",
+   "file": "ding/ding-1.wav",
+   "dur": 1.611,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -3.7,
+   "desc": "Ding: acierto, check, idea",
+   "source": "ding.wav"
+  },
+  "game-over": {
+   "cat": "error",
+   "file": "error/game-over.wav",
+   "dur": 0.763,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -10.5,
+   "desc": "Voz robótica 'game over'",
+   "source": "Robot Voice - game over.wav"
+  },
+  "wrong": {
+   "cat": "error",
+   "file": "error/wrong.wav",
+   "dur": 0.427,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -10.3,
+   "desc": "Error / incorrecto (buzzer)",
+   "source": "Wrong Error Effect.wav"
+  },
+  "pen-writing": {
+   "cat": "foley",
+   "file": "foley/pen-writing.wav",
+   "dur": 2.534,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -19.4,
+   "tp": -1.0,
+   "desc": "Lapicera escribiendo",
+   "source": "pen writing.wav"
+  },
+  "rubber-stretch": {
+   "cat": "foley",
+   "file": "foley/rubber-stretch.wav",
+   "dur": 1.274,
+   "anchor": 0.751,
+   "anchor_mode": "peak",
+   "lufs": -16.8,
+   "tp": -1.0,
+   "desc": "Globo/goma estirándose",
+   "source": "Rubber Balloon Stretch 3.wav"
+  },
+  "toilet-flush": {
+   "cat": "foley",
+   "file": "foley/toilet-flush.wav",
+   "dur": 10.0,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -17.8,
+   "tp": -1.0,
+   "desc": "Inodoro (tirar la cadena, plata que se va)",
+   "source": "toilet-flush.wav"
+  },
+  "zipper": {
+   "cat": "foley",
+   "file": "foley/zipper.wav",
+   "dur": 1.542,
+   "anchor": 1.346,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -1.4,
+   "desc": "Cierre (cremallera)",
+   "source": "Zipper.wav"
+  },
+  "glitch-1": {
+   "cat": "glitch",
+   "file": "glitch/glitch-1.wav",
+   "dur": 2.808,
+   "anchor": 0.52,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -3.0,
+   "desc": "Glitch digital",
+   "source": "soundjay_glitch_main-01.wav"
+  },
+  "glitch-crash": {
+   "cat": "glitch",
+   "file": "glitch/glitch-crash.wav",
+   "dur": 1.403,
+   "anchor": 0.57,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -2.9,
+   "desc": "Compu que se cuelga / crash",
+   "source": "Computer_glitch.wav",
+   "rotate": false
+  },
+  "glitch-out": {
+   "cat": "glitch",
+   "file": "glitch/glitch-out.wav",
+   "dur": 1.142,
+   "anchor": 0.783,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -4.7,
+   "desc": "Glitch que desaparece",
+   "source": "Glitch Disappears.wav"
+  },
+  "bass-drop": {
+   "cat": "hit",
+   "file": "hit/bass-drop.wav",
+   "dur": 4.664,
+   "anchor": 0.542,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -7.9,
+   "desc": "Golpe cinematográfico con caída de graves (remate muy fuerte). No entra en la rotación de \"hit\": pedirlo por id.",
+   "source": "OhmLab_Cinematic-Hit-Dramatic-Bass-Drop.wav",
+   "rotate": false
+  },
+  "hit-1": {
+   "cat": "hit",
+   "file": "hit/hit-1.wav",
+   "dur": 4.0,
+   "anchor": 0.024,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -1.9,
+   "desc": "Golpe con cola, remate",
+   "source": "Mountain Audio - Hit.wav"
+  },
+  "poof-1": {
+   "cat": "poof",
+   "file": "poof/poof-1.wav",
+   "dur": 1.05,
+   "anchor": 0.137,
+   "anchor_mode": "peak",
+   "lufs": -18.1,
+   "tp": -1.0,
+   "desc": "Desaparecer en el aire (puf)",
+   "source": "Disappear-into-Thin-Air_TTX026004.wav"
+  },
+  "drop-1": {
+   "cat": "pop",
+   "file": "pop/drop-1.wav",
+   "dur": 0.638,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -1.4,
+   "desc": "Gota, pop líquido",
+   "source": "Pouring Wet Drops 1.wav"
+  },
+  "drop-2": {
+   "cat": "pop",
+   "file": "pop/drop-2.wav",
+   "dur": 0.64,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -4.5,
+   "desc": "Gota, pop líquido",
+   "source": "Pouring Wet Drops 2.wav"
+  },
+  "plop": {
+   "cat": "pop",
+   "file": "pop/plop.wav",
+   "dur": 1.68,
+   "anchor": 0.112,
+   "anchor_mode": "peak",
+   "lufs": -17.6,
+   "tp": -1.0,
+   "desc": "Plop de agua chico",
+   "source": "SplashesSmallPlopL TE049201.wav"
+  },
+  "pop-1": {
+   "cat": "pop",
+   "file": "pop/pop-1.wav",
+   "dur": 0.216,
+   "anchor": 0.012,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Pop seco y corto",
+   "source": "pop-01.wav"
+  },
+  "splash-1": {
+   "cat": "splash",
+   "file": "splash/splash-1.wav",
+   "dur": 1.259,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -18.5,
+   "tp": -1.0,
+   "desc": "Salpicadura",
+   "source": "Splash 1.wav"
+  },
+  "splash-2": {
+   "cat": "splash",
+   "file": "splash/splash-2.wav",
+   "dur": 1.209,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -19.1,
+   "tp": -1.0,
+   "desc": "Salpicadura",
+   "source": "Splash 2.wav"
+  },
+  "splash-3": {
+   "cat": "splash",
+   "file": "splash/splash-3.wav",
+   "dur": 1.204,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -18.1,
+   "tp": -1.0,
+   "desc": "Salpicadura",
+   "source": "Splash 3.wav"
+  },
+  "splash-4": {
+   "cat": "splash",
+   "file": "splash/splash-4.wav",
+   "dur": 1.046,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -18.8,
+   "tp": -1.0,
+   "desc": "Salpicadura",
+   "source": "Splash 4.wav"
+  },
+  "sweep-cloak": {
+   "cat": "whoosh",
+   "file": "whoosh/sweep-cloak.wav",
+   "dur": 0.969,
+   "anchor": 0.166,
+   "anchor_mode": "peak",
+   "lufs": -16.1,
+   "tp": -1.0,
+   "desc": "Barrido tipo capa, rápido",
+   "source": "Sweep Cloak.wav"
+  },
+  "woosh-1": {
+   "cat": "whoosh",
+   "file": "whoosh/woosh-1.wav",
+   "dur": 0.804,
+   "anchor": 0.143,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -1.4,
+   "desc": "Whoosh corto y limpio",
+   "source": "Woosh 1.wav"
+  },
+  "woosh-2": {
+   "cat": "whoosh",
+   "file": "whoosh/woosh-2.wav",
+   "dur": 0.793,
+   "anchor": 0.143,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -1.5,
+   "desc": "Whoosh corto y limpio",
+   "source": "Woosh 2.wav"
+  },
+  "woosh-3": {
+   "cat": "whoosh",
+   "file": "whoosh/woosh-3.wav",
+   "dur": 0.938,
+   "anchor": 0.096,
+   "anchor_mode": "peak",
+   "lufs": -16.7,
+   "tp": -1.0,
+   "desc": "Whoosh suave, más aireado",
+   "source": "Woosh 3.wav"
+  },
+  "magic-wind": {
+   "cat": "wind",
+   "file": "wind/magic-wind.wav",
+   "dur": 4.0,
+   "anchor": 1.792,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -3.3,
+   "desc": "Viento mágico largo, aparición especial",
+   "source": "Whoosh 6120_73_1.wav",
+   "rotate": false
+  },
+  "zoom-1": {
+   "cat": "zoom",
+   "file": "zoom/zoom-1.wav",
+   "dur": 2.48,
+   "anchor": 0.595,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -2.4,
+   "desc": "Zoom / acercamiento rápido (punch-in, lupa)",
+   "source": "Zoom.wav"
+  }
+ }
+}

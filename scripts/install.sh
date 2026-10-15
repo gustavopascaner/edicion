@@ -12,6 +12,6 @@ command -v brew >/dev/null && { command -v ffmpeg >/dev/null || brew install ffm
 (cd "$SK/engine" && npm ci --silent) && echo "✓ dependencias de node"
 M="$HOME/.cache/whisper-cpp/ggml-large-v3-turbo.bin"
 [ -f "$M" ] || { mkdir -p "$(dirname "$M")"; curl -L -o "$M" https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin; }
-if [ -n "$1" ]; then unzip -o -q "$1" -d "$SK/assets/sfx" -x "__MACOSX/*" && echo "✓ sonidos instalados ($(find "$SK/assets/sfx" -name '*.wav' | wc -l | tr -d ' ') archivos)";
+if [ -n "$1" ]; then unzip -o -q "$1" -d "$SK/assets/sfx" && echo "✓ sonidos instalados ($(find "$SK/assets/sfx" -name '*.wav' | wc -l | tr -d ' ') archivos)";
 elif ! find "$SK/assets/sfx" -name '*.wav' | grep -q .; then echo "⚠️  Faltan los sonidos: volvé a correr con la ruta a edicion-sfx.zip"; fi
 echo "✓ listo. En Claude Code: /edicion <video>. En Codex: \$edicion <video>."

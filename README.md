@@ -8,7 +8,7 @@ Las instrucciones para el agente están en [`SKILL.md`](SKILL.md).
 
 Requisitos: Google Chrome, Node 18+, Python 3 y [Homebrew](https://brew.sh) (para `ffmpeg` y `whisper-cpp`).
 
-No hace falta cuenta de GitHub. Los efectos de sonido **no están en el repo** (tienen licencias de terceros): pedile a Gus el archivo `edicion-sfx.zip` y pasá su ruta al instalador.
+No hace falta cuenta de GitHub. Antes de instalar, bajá `edicion-sfx.zip` (ver [Efectos de sonido](#efectos-de-sonido)) y pasá su ruta al instalador.
 
 ```bash
 git clone https://github.com/gustavopascaner/edicion.git ~/skills/edicion
@@ -38,6 +38,11 @@ Resultado en la carpeta del video: `<NOMBRE>_EDIT/` con el XML, `Assets/{MG,Subt
 | `agents/openai.yaml` | Metadatos para Codex |
 
 ## Efectos de sonido
+
+**Descarga (acceso restringido):** [edicion-sfx.zip en Google Drive](https://drive.google.com/file/d/1xip12kbwPecSh9bdOSapEasYvJaoPAxK/view?usp=sharing)
+
+> **Licencia:** los efectos de sonido no se incluyen en este repositorio porque tienen licencias de terceros (Envato Elements y otros proveedores) que no permiten redistribuirlos. El archivo de Drive solo lo pueden descargar las personas autorizadas. Si no tenés acceso, la skill funciona igual, pero sin sonidos, y avisa cuáles faltan. También podés sumar tus propios sonidos con `scripts/sfx_import.py`. `assets/sfx/catalog.json` solo describe cada sonido (categoría, duración, volumen); no contiene audio.
+
 
 Ver la librería: `python3 -I scripts/sfx_import.py --list`.
 Sumar un sonido: `python3 -I scripts/sfx_import.py archivo.wav --id nombre --cat categoria --desc "cuándo usarlo"`.

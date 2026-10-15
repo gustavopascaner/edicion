@@ -23,7 +23,8 @@ const lastSeg=Math.max(...edl.clips.map(c=>c.seg)),cta=edl.clips.find(c=>c.seg==
 for(const b of B)if(b.start>=cta-0.1)W(`B-roll "${b.src}" cae en el CTA final: dejar la cara a cámara en el cierre.`);
 if(B.length&&B.length<3)W(`Hay ${B.length} b-roll(s): el objetivo son 3 momentos (inicio, medio, antes del CTA).`);
 if(B.length>=2){const s=B.map(b=>b.start).sort((a,b)=>a-b);if(s[s.length-1]-s[0]<T*0.35)W('Los b-rolls están amontonados: repartirlos a lo largo del video.');}
-for(const f of fsj){const d=f.end-f.start;if(d<0.8||d>3.6)W(`Pantalla completa ${f.id} dura ${f2(d)}: ideal 1–3 s.`);}
+for(const f of fsj){const d=f.end-f.start;if(f.scene==='concept'){if(d<2.8||d>4.6)W(`Pantalla conceptual ${f.id} dura ${f2(d)}: ideal 3–4 s.`);}else if(d<0.8||d>3.6)W(`Pantalla completa ${f.id} dura ${f2(d)}: ideal 1–3 s.`);}
+{const cc=fsj.filter(f=>f.scene==='concept');(cc.length?O:W)(cc.length?`Pantalla conceptual sin texto: ${cc.map(f=>f.p.motif).join(', ')}.`:'Falta la pantalla conceptual sin texto (escena "concept", 3–4 s): una de las 3 pantallas completas tiene que ilustrar un concepto con formas animadas.');}
 const fss=fsj.map(f=>f.start).sort((a,b)=>a-b);
 for(let i=1;i<fss.length;i++)if(fss[i]-fss[i-1]<6)W(`Pantallas completas muy seguidas (${f2(fss[i-1])} y ${f2(fss[i])}): espaciarlas ≥ 6 s.`);
 const FSM=cfg.fs_max??3,MGM=cfg.mg_max??3,nOv=ov.length+ov2.length;

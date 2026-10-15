@@ -47,6 +47,7 @@ Helper `H('texto')` = resaltado naranja dentro de líneas `disp`.
 | `letter` | `n, l, word, wsize?, sub, light?, bg, accent` — intro de cada letra del método |
 | `recap` | — IDEAS completo |
 | `speed` | — velocímetro "PISAMOS EL ACELERADOR" |
+| `concept` | `motif, at, bg:'ink'\|'hot'\|'paper', seed?, n?, top?, grid:false?` — **sin texto, 3–4 s** — animación conceptual con formas, líneas y partículas (obligatoria: una de las 3 fs). Motivos abajo. |
 
 ## Subtítulos
 Automáticos (un .mov por clip de V1). Palabra activa resaltada; `config.keywords` = palabras clave con color propio.
@@ -58,3 +59,24 @@ Automáticos (un .mov por clip de V1). Palabra activa resaltada; `config.keyword
 Escribir `SC.nombre=p=>{ ...construir DOM con h(), ml(), kick()...; return t=>{ ...animar según t... } }` en engine.html antes de `SC.listCard=listCard;`.
 Helpers: `P(t,a,d)` progreso 0–1 · `E.expo/back/el/o3/io` easings · `rise(el,t,a)` máscara que sube · `popIn(el,t,a)` · `OV(card)` entrada/salida de tarjeta · `FS(bg,accent)` wipe de pantalla completa · `DUR` duración.
 Siempre incluir salida en los últimos 0.3 s. Revisar con `--test` + sheets.py antes del render final.
+
+## Motivos de `concept` (animaciones sin texto)
+Todos usan los colores del fondo elegido (`bg`: ink → crema + naranja, hot → tinta + lima, paper → tinta + naranja) y tienen un **momento clave** en `at` (default: mitad de la escena, máx. 1,8 s), que conviene sincronizar con la palabra del concepto.
+| motivo | qué muestra | para ideas como |
+|---|---|---|
+| `growth` | barras que suben + línea de tendencia + punto que late | crecer, mejorar, resultados, más pacientes |
+| `network` | nodos que aparecen y se conectan con un centro que se enciende | comunidad, recomendaciones, contactos, sistema |
+| `cycle` | flechas en círculo que giran y aceleran | hábitos, repetir, constancia, proceso continuo |
+| `funnel` | muchas partículas entran a un embudo y pasan pocas | filtrar, elegir, conversión, los correctos |
+| `target` | anillos concéntricos y un dardo que da en el centro | objetivo, foco, precisión, público ideal |
+| `balance` | balanza que oscila y se equilibra | equilibrio, decisión, comparar, justo |
+| `breakthrough` | pelota que rompe una pared de bloques | superar un obstáculo, romper una barrera |
+| `order` | puntos caóticos que se ordenan en una grilla | orden, método, sistema, claridad |
+| `pulse` | electrocardiograma que se dibuja + corazón que late | salud, vida, cuidado, emoción |
+| `path` | camino curvo con un marcador que llega a la bandera | recorrido, proceso, meta, paso a paso |
+| `attract` | partículas atraídas hacia un centro que crece | atraer pacientes, magnetismo, interés |
+| `dialog` | dos personas, ondas de ida y vuelta y aparece un corazón | escuchar, comunicar, vínculo, empatía |
+| `split` | camino que se bifurca; uno se apaga y el otro se resalta | elegir, decisión, el camino correcto |
+| `stack` | bloques que caen y forman una torre | construir, acumular, paso a paso, base |
+
+Nuevo motivo: `MOT.nombre=(g,p,a,D,r)=>{ …dibujar con sv('circle'|'path'|'line'|…, attrs, g, css)… return t=>{…} }` en un lienzo SVG de 1000×1000 (zona visible ≈110–890). Helpers: `spop` (aparecer), `dash` (dibujar líneas), `ripple` (onda), `r()` aleatorio con semilla. Colores solo con `FG`, `HL`, `HL2`, `SUB`. Probar con `--test --at=0.5,<at>,end`.

@@ -6,7 +6,7 @@ Qué hace:
 - **Corte ajustado**: saca pausas, tomas falladas y repeticiones, y verifica el corte re-transcribiéndolo.
 - **Motion graphics** con alfa (tarjetas, listas, sellos, pantallas completas) sincronizados con las palabras, y **subtítulos dinámicos**.
 - **B-roll semántico y música de Envato**: elige 3 momentos, busca con el MCP de Envato, ubica las vistas previas y las reemplaza por los originales licenciados.
-- **Diseño sonoro automático** con la librería de SFX: cada aparición, check, tachado, sello o corte suena, con control de densidad.
+- **Diseño sonoro sutil** con la librería de SFX: como máximo 5 efectos en toda la edición, en los momentos más importantes (remates, gancho, CTA, cortes).
 - **Reencuadres y zooms** según la intención de cada frase (snap en el gancho, punch-in en el énfasis, alternancia para disimular jump cuts).
 - **Dirección creativa**: revisa que b-roll, gráficos, subtítulos, cámara, SFX y música no compitan, y dibuja la línea de tiempo.
 - **Tiempo de procesamiento**: al terminar informa cuánto tardó, con el desglose por paso.

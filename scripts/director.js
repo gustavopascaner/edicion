@@ -41,7 +41,8 @@ if(!evs.length||evs[0]>1.0)W('Nada visual en el primer segundo: el gancho necesi
 // ── Sonido ──
 const hits=sfx.filter(x=>x.cat==='hit');for(let i=1;i<hits.length;i++)if(hits[i].at-hits[i-1].at<4)W(`Dos golpes (hit) a menos de 4 s (${f2(hits[i-1].at)} y ${f2(hits[i].at)}): pierden fuerza.`);
 for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<0.25&&sfx[i].cat!=='build'&&sfx[i-1].cat!=='build')W(`SFX encimados en ${f2(sfx[i].at)}: ${sfx[i-1].id} + ${sfx[i].id}.`);
-const dens=sfx.length/T*10;(dens>5?W:O)(`SFX: ${sfx.length} sonidos (${dens.toFixed(1)} cada 10 s)${dens>5?' — demasiados, bajar con config.sfx_per_10s':''}.`);
+const SMAX=cfg.sfx_max??5;(sfx.length>SMAX?W:O)(`SFX: ${sfx.length} en toda la edición (máximo ${SMAX})${sfx.length>SMAX?' — sacar los menos importantes':''}: ${sfx.map(x=>x.id+' '+f2(x.at)).join(' · ')}.`);
+for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<3)W(`SFX muy cerca (${f2(sfx[i-1].at)} y ${f2(sfx[i].at)}): separarlos ≥ 3 s para que sea sutil.`);
 const M=cfg.music&&typeof cfg.music==='object'?cfg.music:null;
 if(M){if((M.envato||{}).status==='preview')W('La música es la vista previa con marca de agua de Envato: falta licenciarla.');O(`Música: gancho ${M.hook_gain??.3} → fondo ${M.bed_gain??.08} bajo la voz → cierre ${M.outro_gain??.22}.`);}
 else if(cfg.music)O('Música colocada a mano (X).');else W('Sin música de fondo.');

@@ -2,77 +2,77 @@
  "target_lufs": -16.0,
  "categories": {
   "whoosh": {
-   "gain": 0.35,
+   "gain": 0.22,
    "auto": true,
    "desc": "Transiciones: entrada de pantallas completas, wipes, cambios de tarjeta. Se alternan."
   },
   "build": {
-   "gain": 0.4,
+   "gain": 0.25,
    "auto": true,
    "desc": "Crece hasta el evento (reverse-whoosh antes de un corte; riser antes de un gran remate)."
   },
   "zoom": {
-   "gain": 0.35,
+   "gain": 0.2,
    "auto": true,
    "desc": "Punch-in, lupa, acercar la atención."
   },
   "wind": {
-   "gain": 0.3,
+   "gain": 0.2,
    "auto": true,
    "desc": "Aparición especial/mágica, revelación suave."
   },
   "pop": {
-   "gain": 0.4,
+   "gain": 0.25,
    "auto": true,
    "desc": "Aparición de tarjetas, stickers, ítems de lista."
   },
   "click": {
-   "gain": 0.45,
+   "gain": 0.25,
    "auto": true,
    "desc": "Interfaces: botones, búsquedas, DMs, seguir, tildar."
   },
   "bounce": {
-   "gain": 0.35,
+   "gain": 0.22,
    "auto": true,
    "desc": "Elementos que rebotan, tono de humor."
   },
   "hit": {
-   "gain": 0.45,
+   "gain": 0.3,
    "auto": true,
    "desc": "Remates fuertes, sellos, pantallas completas de impacto. bass-drop solo para el remate más fuerte."
   },
   "ding": {
-   "gain": 0.35,
+   "gain": 0.2,
    "auto": true,
    "desc": "Check ✓, acierto, idea, dato positivo."
   },
   "error": {
-   "gain": 0.4,
+   "gain": 0.2,
    "auto": true,
    "desc": "Tachar, ✗, lo que está mal, mito."
   },
   "glitch": {
-   "gain": 0.35,
+   "gain": 0.2,
    "auto": true,
    "desc": "Algo que falla, se rompe o desaparece; tono tech."
   },
   "poof": {
-   "gain": 0.4,
+   "gain": 0.22,
    "auto": true,
    "desc": "Algo que desaparece en el aire."
   },
   "foley": {
-   "gain": 0.35,
+   "gain": 0.25,
    "auto": false,
    "desc": "Literales: solo cuando lo que se dice/ve coincide (escribir, cierre, estirar, inodoro)."
   },
   "splash": {
-   "gain": 0.35,
+   "gain": 0.22,
    "auto": false,
    "desc": "Literales: agua, salpicar, caer en algo."
   },
   "car": {
-   "gain": 0.3,
+   "gain": 0.2,
    "auto": false,
    "desc": "Literales: autos, arrancar, pasar de largo."
   }

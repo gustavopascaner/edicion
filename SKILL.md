@@ -47,7 +47,7 @@ Crear `<work>/config.json` (abajo) y correr `python3 -I $SK/scripts/edl.py "<wor
   "markers": [["HOOK",0],["CTA · Mandame un mensaje",17]] }
 ```
 `tail` = segundos extra al final (cara a cámara) para que se lea el último gráfico.
-`face.top` = altura (0–1) de la parte de arriba de la cabeza en el cuadro (mirarlo en el frame del paso 0.4): limita el zoom máximo para no cortarla. `music` lo completa `envato.py use` (o una ruta de la carpeta del video). Opcionales: `sfx_per_10s` (densidad de SFX, default 4), `sound_design: "manual"`, `max_zoom`.
+`face.top` = altura (0–1) de la parte de arriba de la cabeza en el cuadro (mirarlo en el frame del paso 0.4): limita el zoom máximo para no cortarla. `music` lo completa `envato.py use` (o una ruta de la carpeta del video). Opcionales: `sfx_max` (máximo de SFX en toda la edición, default 5), `sound_design: "manual"`, `max_zoom`.
 
 ## 4 · Diseñar los motion graphics → `<work>/jobs.js`
 Basarse en `reference/ejemplo_jobs.js` y `reference/escenas.md`. Estilo fijo (al usuario le encantó, no cambiarlo): tarjetas crema con kicker mono y punto naranja, títulos Bricolage condensados en mayúsculas, resaltados naranja, ✓ lima, pantallas completas con grano y wipe en capas.
@@ -85,10 +85,11 @@ Todos los SFX viven en `$SK/assets/sfx/<categoría>/<id>.wav`, normalizados a �
 | `zoom` · `bounce` · `wind` | Punch-in o lupa · rebote con humor · aparición mágica |
 | `foley` · `splash` · `car` | **Literales**: solo si lo que se dice o se ve coincide (escribir, cierre, estirar, inodoro, agua, autos) |
 
-**Automático** (por defecto): cada gráfico suena según su escena y sus momentos internos — tarjeta → `pop`; ✓ → `ding`; ✕ y tachado → `error`; sello/stop/remate → `hit`; buscador, DM, seguir → `click`; pantalla completa → `whoosh` (bigword → `hit`); `reverse-whoosh` antes del primer remate grande; `whoosh` suave al cortar a b-roll; `zoom` en el snap del gancho. Después se raleán por prioridad: ≥ 0,35 s entre sonidos, ≤ 3 cada 2 s y ≤ `sfx_per_10s` (4) cada 10 s. Las variantes se alternan para que no suene siempre igual.
-Manual (pisa al automático para ese gráfico):
+**Regla del usuario: como máximo 5 efectos en TODA la edición, elegidos con sutileza.** Más que eso queda brusco.
+**Automático** (por defecto): se juntan los momentos candidatos (entrada de cada gráfico y sus momentos internos: ✓ → `ding`, sello/remate → `hit`, buscador/DM/seguir → `click`, pantalla completa → `whoosh`, corte a b-roll → `whoosh`) y se eligen solo los 5 más importantes: remates y pantallas completas > el gancho > el CTA > el corte a b-roll > tarjetas > detalles internos, separados al menos ~6 s entre sí (≥ 3 s en videos cortos). Volúmenes bajos (≈ −11 a −14 dB respecto de la voz). Las variantes se alternan.
+Al revisar el plan, preguntarse en cada uno si **suma**; si no, sacarlo (`J(..., null)`). Menos es mejor: 3 bien puestos valen más que 5.
+Manual (pisa al automático para ese gráfico; cuenta para el máximo de 5):
 - Categoría o id puntual: `J(..., 'pop')` · `J(..., 'bass-drop')` · `J(..., null)` = sin sonido.
-- Varios sonidos dentro de un gráfico, en segundos desde su inicio: `J(..., ['pop', ['ding', R(s,W(3,'formando'))], ['click', 1.2, {gain:.2}]])`. Usarlo para que cada ✓ de una lista suene (`ding` o `pop`) al aparecer.
 - Sonido suelto en un segundo de la línea de tiempo: `S('splash', W(4,'agua'))` · `S('car-pass-2', t, {gain:.25, dur:3})`.
 Los literales (`foley`, `splash`, `car`) nunca son automáticos: ponerlos con `S()` solo cuando suman al chiste o la metáfora. `node render.js --plan` lista todos los SFX (los automáticos marcados `(auto)`).
 Para sumar sonidos nuevos: `python3 -I $SK/scripts/sfx_import.py <archivo> --id <id> --cat <categoría> [--anchor peak|onset] [--max 4] --desc "..."` (recorta, normaliza y lo registra).
@@ -101,7 +102,7 @@ Para sumar sonidos nuevos: `python3 -I $SK/scripts/sfx_import.py <archivo> --id 
 
 ## 5 · Dirección creativa, prueba y render
 1. `node $SK/scripts/render.js "<work>" --plan` (lista los gráficos, SFX y encuadres con tiempos; detecta palabras no encontradas).
-2. **Dirección creativa**: `node $SK/scripts/director.js "<work>"` → informe (`direction.md`) + línea de tiempo (`timeline.png`, mirarla). Revisa que nada compita: dos tarjetas a la vez, tarjetas tapando el b-roll, b-roll bajo una pantalla completa o en el CTA, pantallas completas muy seguidas o muy largas, cara visible < 55 %, tramos de más de 12 s sin ningún evento, golpes muy seguidos, SFX encimados o demasiados, jump cuts sin cambio de encuadre, material de Envato sin licenciar. **Corregir todos los ⚠️** en jobs.js / config.json y repetir 1–2 hasta que quede limpio (o justificar en el LEEME los que se dejan a propósito).
+2. **Dirección creativa**: `node $SK/scripts/director.js "<work>"` → informe (`direction.md`) + línea de tiempo (`timeline.png`, mirarla). Revisa que nada compita: dos tarjetas a la vez, tarjetas tapando el b-roll, b-roll bajo una pantalla completa o en el CTA, pantallas completas muy seguidas o muy largas, cara visible < 55 %, tramos de más de 12 s sin ningún evento, más de 5 SFX o SFX a menos de 3 s entre sí, jump cuts sin cambio de encuadre, material de Envato sin licenciar. **Corregir todos los ⚠️** en jobs.js / config.json y repetir 1–2 hasta que quede limpio (o justificar en el LEEME los que se dejan a propósito).
 3. `T=end-0.4 node $SK/scripts/render.js "<work>" --test --only='^(?!cap)'` y luego `python3 -I $SK/scripts/sheets.py "<work>"` → **mirar las hojas (imágenes)** y corregir: textos cortados, superposiciones, elementos tapando lo importante del b-roll, timing (que el gráfico termine de armarse antes de salir).
 4. Render final (en segundo plano, tarda unos minutos): `node $SK/scripts/render.js "<work>" --only='^(?!cap)'` y después `node $SK/scripts/render.js "<work>" --only='^cap'`. Los SFX se copian a `Assets/SFX` al armar el XML.
 

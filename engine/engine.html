@@ -345,8 +345,8 @@ SC.textcard=p=>{
 SC.dm=p=>{
  const card=h('div','top:330px;padding:0;overflow:hidden',S,null,'card');
  const hd=h('div','display:flex;align-items:center;gap:22px;padding:30px 40px;background:var(--ink);color:var(--paper)',card);
- h('div','width:80px;height:80px;border-radius:50%;background:var(--hot);display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--ink)',hd,'G','disp');
- const ht=h('div','',hd);h('div','font-family:Inter;font-weight:800;font-size:40px',ht,'Gus Pascaner');h('div','font-size:22px;color:var(--lime)',ht,'● ACTIVO AHORA','mono');
+ h('div','width:80px;height:80px;border-radius:50%;background:var(--hot);display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--ink)',hd,p.av||'G','disp');
+ const ht=h('div','',hd);h('div','font-family:Inter;font-weight:800;font-size:40px',ht,p.name||'Gus Pascaner');h('div','font-size:22px;color:var(--lime)',ht,'● ACTIVO AHORA','mono');
  h('div','margin-left:auto;background:var(--hot);color:var(--ink);padding:10px 18px;border-radius:12px;font-size:24px',hd,p.opt,'mono');
  const body=h('div','padding:34px 40px;display:flex;flex-direction:column;gap:18px;min-height:380px',card);
  const b1=h('div','align-self:flex-end;max-width:80%;background:var(--hot);color:var(--ink);padding:26px 32px;border-radius:34px 34px 8px 34px;font-family:Inter;font-weight:700;font-size:44px;line-height:1.1',body,p.msg);
@@ -435,7 +435,7 @@ SC.stat=p=>{
  const k=h('div','display:inline-block;background:var(--ink);color:var(--paper);padding:12px 22px;border-radius:12px;font-size:28px',w,p.kick,'mono');
  const num=h('div','display:block;width:fit-content;margin-top:18px;background:var(--hot);color:var(--ink);padding:10px 30px 0;border-radius:28px;font-size:300px;font-variant-numeric:tabular-nums;line-height:.9',w,'0%','disp');
  const l1=ml(w,'<span style="background:var(--ink);color:var(--paper);padding:0 20px">'+p.l1+'</span>','font-size:96px;margin-top:18px','disp');
- return t=>{popIn(k,t,.05);popIn(num,t,.1,.5);const v=E.o3(P(t,.15,p.countEnd||1.2))*p.to;num.textContent=v.toFixed(1).replace('.',',')+'%';rise(l1,t,.35);
+ return t=>{popIn(k,t,.05);popIn(num,t,.1,.5);const v=E.o3(P(t,.15,p.countEnd||1.2))*p.to;num.textContent=v.toFixed(p.dec??1).replace('.',',')+'%';rise(l1,t,.35);
   const o=E.io(P(t,DUR-.3,.3));w.style.opacity=1-o;w.style.transform=`translateY(${-o*40}px)`;};
 };
 // ---------- X-ray HUD over b-roll ----------

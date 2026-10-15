@@ -72,27 +72,24 @@ const AUTO={
   fsTitle:p=>[['whoosh',0],p.marks?A('error',p.marksAt):null], bigword:()=>[['hit',0]], counter:p=>[['whoosh',0],A('error',p.strikeAt)],
   metrics:p=>[['whoosh',0],...each(p.tiles,t=>A('pop',t.at)),A('hit',p.stampAt)], calendar:p=>[['whoosh',0],A('pop',p.qAt)],
 };
-const PRIO={hit:5,build:5,whoosh:4,foley:4,splash:4,car:4,error:3,ding:3,glitch:3,poof:3,zoom:3,wind:3,click:2,bounce:2,pop:1};
-const catOf=spec=>CAT.categories[spec]?spec:(CAT.sounds[spec]||{}).cat;
+// Pocos sonidos y sutiles: como máximo cfg.sfx_max (default 5) en TODA la edición, elegidos por importancia
+// (remates y pantallas completas > gancho > CTA > b-roll > tarjetas > detalles internos) y bien separados entre sí.
+const T_=edl.total/FPS,lastSeg=Math.max(...edl.clips.map(c=>c.seg)),ctaT=edl.clips.find(c=>c.seg===lastSeg).tl_in/FPS;
+const firstJob=userJobs.filter(j=>j.track!=='cap').sort((a,b)=>a.start-b.start)[0];
 if(cfg.sound_design!=='manual'){
   for(const j of userJobs){if(j.sfx!=='auto'||j.track==='cap')continue;
     const rule=AUTO[j.scene]||(j.track==='fs'?()=>[['whoosh',0]]:()=>[['pop',0]]);
-    for(const e of rule(j.p).filter(Boolean))if(e[1]>=0&&e[1]<j.end-j.start-0.15)ev.push({spec:e[0],t:j.start+e[1],o:{}});}
-  // build antes del remate más fuerte (primer bigword/stamp a pantalla completa)
-  const big=userJobs.find(j=>j.track==='fs'&&/bigword|stamp/.test(j.scene));if(big&&big.start>2)ev.push({spec:'reverse-whoosh',t:big.start,o:{},pre:true});
-  // corte a b-roll
-  for(const b of broll)ev.push({spec:'whoosh',t:b.start,o:{gain:.25},prioAdj:-2});}
-// raleo: manuales siempre; automáticos por prioridad, con ≥ 0,35 s entre sonidos y ≤ 3 sonidos cada 2 s
-const GAP=cfg.sfx_gap??0.35,kept=[];
-for(const e of ev)e.prio=(e.manual?10:PRIO[catOf(e.spec)]||1)+(e.prioAdj||0);
-for(const e of ev.slice().sort((a,b)=>b.prio-a.prio||a.t-b.t)){
-  if(!e.manual&&!e.pre){const near=kept.filter(k=>!k.pre&&Math.abs(k.t-e.t)<1);
-    if(near.some(k=>Math.abs(k.t-e.t)<GAP)||near.length>=3)continue;}
-  kept.push(e);}
-// presupuesto: ≤ cfg.sfx_per_10s sonidos cada 10 s (default 4). Sobran → se sacan los automáticos de menor prioridad más amontonados
-const budget=Math.round((cfg.sfx_per_10s??4)*edl.total/FPS/10);kept.sort((a,b)=>a.t-b.t);
-while(kept.length>budget){const cand=kept.map((e,k)=>({e,k,g:Math.min(k?e.t-kept[k-1].t:99,k<kept.length-1?kept[k+1].t-e.t:99)})).filter(x=>!x.e.manual&&!x.e.pre);
-  if(!cand.length)break;const lo=Math.min(...cand.map(x=>x.e.prio));const v=cand.filter(x=>x.e.prio===lo).sort((a,b)=>a.g-b.g)[0];kept.splice(v.k,1);}
+    for(const e of rule(j.p).filter(Boolean)){if(!(e[1]>=0&&e[1]<j.end-j.start-0.15))continue;
+      const entry=e[1]===0,strongScene=/bigword|stamp/.test(j.scene);
+      const score=entry?(j.track==='fs'?(strongScene?11:10):strongScene?9:j===firstJob&&j.start<1.5?9:j.start>=ctaT-0.1?7:4)
+                       :(e[0]==='hit'?8:e[0]==='error'?1:2);
+      ev.push({spec:e[0],t:j.start+e[1],o:{},score});}}
+  for(const b of broll)ev.push({spec:'whoosh',t:b.start,o:{},score:6});}
+const MAX=cfg.sfx_max??5,SEP=Math.max(3,Math.min(7,T_/(MAX+1))),kept=ev.filter(e=>e.manual);
+if(kept.length>MAX)console.warn(`⚠️  Hay ${kept.length} SFX manuales y el máximo es ${MAX}: sacar algunos.`);
+for(const e of ev.filter(e=>!e.manual).sort((a,b)=>b.score-a.score||a.t-b.t)){
+  if(kept.length>=MAX)break;if(kept.some(k=>Math.abs(k.t-e.t)<SEP))continue;kept.push(e);}
+kept.sort((a,b)=>a.t-b.t);
 const missing=new Set();
 for(const e of kept){const id=pick(e.spec),m=CAT.sounds[id];last.id=id;
   if(!fs.existsSync(path.join(SFXDIR,m.file))){if(!missing.size)console.warn('⚠️  Faltan sonidos de la librería (instalar edicion-sfx.zip, ver README). Se omiten:');
@@ -128,8 +125,6 @@ edl.clips.forEach((c,i)=>{const a=c.tl_in/FPS,b=c.tl_out/FPS,txt=c.text||'';let 
     if(Math.abs(pe-s0)<8){[s0,s1]=pe>=108?[100,103]:[cap(114),cap(114)];m=pe>=108?'wide':'tight';}}
   if(m==='punch')lastPunch=a;
   framing.push({i,mode:m,s0,s1,ramp:m==='snap'?0.25:null,tl_in:c.tl_in,tl_out:c.tl_out});prev=m;});
-if(framing[0]&&framing[0].mode==='snap'&&cfg.sound_design!=='manual'&&!sfx.some(x=>x.at<0.4))S0('zoom',0.02);
-function S0(spec,t){const id=pick(spec),m=CAT.sounds[id];if(fs.existsSync(path.join(SFXDIR,m.file)))sfx.push({id,cat:m.cat,file:m.file,start:Math.max(0,+(t-m.anchor).toFixed(3)),sin:+Math.max(0,m.anchor-t).toFixed(3),dur:+(m.dur-Math.max(0,m.anchor-t)).toFixed(3),fdur:m.dur,gain:.25,at:t,auto:true});}
 fs.writeFileSync(path.join(WD,'framing.json'),JSON.stringify(framing,null,1));
 fs.writeFileSync(path.join(WD,'jobs.json'),JSON.stringify(jobs,null,1));
 fs.writeFileSync(path.join(WD,'broll.json'),JSON.stringify({broll,extraSfx},null,1));

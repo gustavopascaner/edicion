@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Paso 3: arma la línea de tiempo (un clip por región de voz) y VERIFICA el corte re-transcribiéndolo.
 uso: python3 -I edl.py <workdir> [--no-verify]   → <workdir>/edl.json (+ cut.wav y transcripción del corte)
-Lee config.json (fps, tail = segundos extra al final para que se lea el último gráfico).
+Lee config.json (fps, tail = segundos extra al final para que se lea el último gráfico; post_pad 0.08 / post_pad_end 0.14 = aire después de la voz).
 """
 import os as _o,sys as _s,subprocess as _sp
 if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
@@ -10,12 +10,17 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Línea de tiempo + verificación',time.time()-_t0))
-FPS=cfg.get('fps',30);PRE,POST=0.04,0.06;TAIL=cfg.get('tail',1.2)
+FPS=cfg.get('fps',30);PRE=0.04;TAIL=cfg.get('tail',1.2)
+# Aire después de la voz para no comerse la última letra: más al final de una frase (punto, coma, pregunta o cambio de segmento)
+POST=cfg.get('post_pad',0.08);POST_END=cfg.get('post_pad_end',0.14)
 P=json.load(open(os.path.join(W,'tight.json')))
 f=lambda x:int(round(x*FPS))
 clips=[];caps=[];t=0
 for ci,p in enumerate(P):
-    a=p['a']-PRE;b=p['b']+POST+(TAIL if ci==len(P)-1 else 0);sin,sout=f(a),f(b);dur=sout-sin
+    nx=P[ci+1] if ci+1<len(P) else None;end=(not nx) or nx['seg']!=p['seg'] or p['t'].rstrip().endswith(('.',',',':',';','?','!','…'))
+    post=POST_END if end else POST
+    if nx and p['a']<nx['a']<p['b']+post+PRE: post=max(0.04,nx['a']-PRE-p['b']-0.01)   # no pisar el arranque de la toma siguiente
+    a=p['a']-PRE;b=p['b']+post+(TAIL if ci==len(P)-1 else 0);sin,sout=f(a),f(b);dur=sout-sin
     clips.append(dict(i=ci,seg=p['seg'],src_in=sin,src_out=sout,tl_in=t,tl_out=t+dur,text=p['t']))
     words=p['t'].split();groups=[];cur=[]
     for w in words:

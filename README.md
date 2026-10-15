@@ -7,6 +7,7 @@ Qué hace:
 - **Motion graphics** con alfa sincronizados con las palabras: 3 pantallas completas y como máximo 3 gráficos superpuestos. Una de las pantallas completas es **conceptual y sin texto** (3–4 s): ilustra una idea del discurso con formas, líneas y partículas animadas (14 motivos). **Subtítulos dinámicos** todo el tiempo, que se ocultan solos mientras hay un motion graphic para no competir.
 - **B-roll semántico y música de Envato**: elige 3 momentos, busca con el MCP de Envato, ubica las vistas previas y las reemplaza por los originales licenciados.
 - **Diseño sonoro sutil** con la librería de SFX: como máximo 5 efectos en toda la edición, en los momentos más importantes (remates, gancho, CTA, cortes).
+- **No pisar la cara**: detecta dónde está la cara y decide la ubicación — si quedó baja en el cuadro, los subtítulos van arriba de la cabeza; si está normal, abajo — y mueve los motion graphics que la tapen a la zona libre.
 - **Reencuadres y zooms** según la intención de cada frase (snap en el gancho, punch-in en el énfasis, alternancia para disimular jump cuts).
 - **Dirección creativa**: revisa que b-roll, gráficos, subtítulos, cámara, SFX y música no compitan, y dibuja la línea de tiempo.
 - **Tiempo de procesamiento**: al terminar informa cuánto tardó, con el desglose por paso.

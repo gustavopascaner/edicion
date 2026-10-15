@@ -9,6 +9,7 @@ const {CHROME,fileURL,logTime}=require('./platform.js');
 const WD=path.resolve(process.argv[2]);
 const cfg=JSON.parse(fs.readFileSync(path.join(WD,'config.json')));
 const FPS=cfg.fps||30;
+const LAY=require('./layout.js')(cfg);
 const edl=JSON.parse(fs.readFileSync(path.join(WD,'edl.json')));
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
 // W(seg, palabra, n) → segundo de timeline donde empieza esa palabra dentro del segmento
@@ -61,7 +62,7 @@ edl.clips.forEach((c,i)=>{const s=c.tl_in/FPS,e=c.tl_out/FPS,groups=[];
       const b=Math.min(last?g.tl_out/FPS:run[run.length-1].ge+0.12,nextMG(run[0].gs));
       groups.push({s:R(s,a),e:R(s,b),words:run.map(w=>({w:w.w,s:R(s,w.gs),e:R(s,w.ge),k:w.k}))});run=[];};
     ws.forEach((w,k)=>{if(inMG(w.gs,w.ge)){flush(false);capHidden++;}else run.push(w);});flush(true);}
-  if(groups.length)J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups});});
+  if(groups.length)J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups,y:LAY.capTop});});
 if(capHidden)console.log(`subtítulos: ${capHidden} palabras ocultas bajo motion graphics`);
 // Límite del usuario: 3 pantallas completas y como máximo 3 motion graphics superpuestos (ov/ov2) en toda la edición
 {const nFs=userJobs.filter(j=>j.track==='fs').length,nOv=userJobs.filter(j=>j.track==='ov'||j.track==='ov2').length;
@@ -139,6 +140,9 @@ edl.clips.forEach((c,i)=>{const a=c.tl_in/FPS,b=c.tl_out/FPS,txt=c.text||'';let 
   if(m==='punch')lastPunch=a;
   framing.push({i,mode:m,s0,s1,ramp:m==='snap'?0.25:null,tl_in:c.tl_in,tl_out:c.tl_out});prev=m;});
 fs.writeFileSync(path.join(WD,'framing.json'),JSON.stringify(framing,null,1));
+// No pisar la cara: los MG superpuestos (no los que van sobre b-roll, donde la cara no se ve) se reubican si la tocan (engine: avoidFace)
+for(const j of jobs){if(j.track!=='ov'&&j.track!=='ov2')continue;if(j.scene==='tracker'||j.p.free)continue;
+  const ov=broll.reduce((a,x)=>a+Math.max(0,Math.min(j.end,x.start+x.dur)-Math.max(j.start,x.start)),0);if(ov<(j.end-j.start)*.5)j.p._place=true;}
 fs.writeFileSync(path.join(WD,'jobs.json'),JSON.stringify(jobs,null,1));
 fs.writeFileSync(path.join(WD,'broll.json'),JSON.stringify({broll,extraSfx},null,1));
 fs.writeFileSync(path.join(WD,'sfx.json'),JSON.stringify(sfx.sort((a,b)=>a.start-b.start),null,1));
@@ -155,9 +159,11 @@ async function main(){
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
     await page.goto(fileURL(path.join(ENG,'engine.html')));await page.evaluate(()=>document.fonts.ready);
+    await page.evaluate(L=>{window.SAFE=L.face?L:null;},LAY);
     await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||null);
     while(qi<list.length){const j=list[qi++];const dur=j.end-j.start;const nf=Math.round(dur*FPS);
-      try{await page.evaluate((j,dur)=>{if(j.p.tiles)j.p.tiles.forEach(t=>t.fmt=FMT[t.fmt]);setup(j.scene,j.p,dur);},j,dur);}catch(e){console.log('ERR',j.id,e.message.split('\n')[0]);continue;}
+      try{const pl=await page.evaluate((j,dur)=>{if(j.p.tiles)j.p.tiles.forEach(t=>t.fmt=FMT[t.fmt]);return setup(j.scene,j.p,dur);},j,dur);
+        if(pl&&pl.mode!=='ok')console.log(`  cara: ${j.id} ${pl.mode}${pl.mode==='movido'?` (y ${pl.from}→${pl.to}, escala ${Math.round(pl.scale*100)} %)`:' — revisar a mano'}`);}catch(e){console.log('ERR',j.id,e.message.split('\n')[0]);continue;}
       if(test){const ts=((process.argv.find(a=>a.startsWith('--t='))||'').slice(4)||process.env.T||'end-0.4').split(',');
         for(const x of ts){let t=x==='mid'?dur/2:x.startsWith('end')?dur+parseFloat(x.slice(3)):parseFloat(x);if(isNaN(t))continue;
           await page.evaluate((t)=>frame(t,Math.round(t*30)),t);await page.screenshot({path:path.join(outFor(j),`${j.id}_t${t.toFixed(2)}.png`),omitBackground:true});}
@@ -174,6 +180,7 @@ async function main(){
 }
 if(process.argv.includes('--plan')){console.log(jobs.filter(j=>j.track!=='cap').map(j=>`${j.id.padEnd(24)} ${j.track.padEnd(4)} ${j.start.toFixed(2)}-${j.end.toFixed(2)}`).join('\n'));console.log(JSON.stringify(broll));
   console.log('SFX:\n'+sfx.map(x=>`  ${x.at.toFixed(2).padStart(6)}  ${x.id.padEnd(16)} gain ${x.gain}${x.auto?'  (auto)':''}`).join('\n'));
-  console.log('Encuadres: '+framing.map(f=>`${f.i}:${f.mode}`).join(' '));}
+  console.log('Encuadres: '+framing.map(f=>`${f.i}:${f.mode}`).join(' '));
+  console.log('Ubicación: '+LAY.note+` · ${jobs.filter(j=>j.p._place).length} MG se chequean contra la cara al renderizar`);}
 else{const t0=Date.now();main().then(()=>{const lab=process.argv.includes('--test')?'Render de prueba':process.argv.some(a=>a.includes('cap'))&&!process.argv.some(a=>a.includes('?!cap'))?'Render de subtítulos':'Render de motion graphics';
   logTime(WD,lab,(Date.now()-t0)/1000);}).catch(e=>{console.error(e);process.exit(1)});}

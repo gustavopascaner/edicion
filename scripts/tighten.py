@@ -21,7 +21,7 @@ def db(i):
     return 20*math.log10(max(1,math.sqrt(sum(x*x for x in seg)/len(seg)))/32768)
 ENV=[db(i) for i in range(len(S)//N)]
 FLOOR=sorted(ENV)[len(ENV)//10]
-TH=-32; GAP=0.25; ATT=max(FLOOR+10,-46); DEC=max(FLOOR+12,-42)
+TH=-32; GAP=0.25; ATT=max(FLOOR+10,-46); DEC=max(FLOOR+8,-46)   # cola: seguir hasta que la voz se apaga del todo (s, n, vocales finales)
 print(f'piso de ruido {FLOOR:.0f} dB · umbral voz {TH} · ataque {ATT:.0f} · cola {DEC:.0f}')
 SEG=json.load(open(os.path.join(W,'segs.json')))
 def regions(a,b):
@@ -43,7 +43,7 @@ def regions(a,b):
         while k<15 and ENV[i-1]>ATT: i-=1;k+=1
         r[0]=i*HOP
         j=int(r[1]/HOP);k=0
-        while k<20 and j<len(ENV) and ENV[j]>DEC: j+=1;k+=1
+        while k<35 and j<len(ENV) and ENV[j]>DEC: j+=1;k+=1
         r[1]=j*HOP
     return merged
 def heard(a,b,prompt):

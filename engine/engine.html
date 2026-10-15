@@ -417,7 +417,7 @@ SC.book=p=>{
 // ---------- captions ----------
 SC.cap=p=>{
  // p.groups:[{s,e,words:[{w,s,e}]}] times in seconds local
- const w=h('div','position:absolute;left:70px;right:70px;top:1230px;display:flex;justify-content:center');
+ const w=h('div',`position:absolute;left:70px;right:70px;top:${p.y??1230}px;display:flex;justify-content:center`);   // p.y: lo decide layout.js para no pisar la cara
  const gs=p.groups.map(g=>{const box=h('div','position:absolute;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;text-align:center',w);
   g.els=g.words.map(x=>{const s=h('span','font-family:Brico;font-weight:800;font-stretch:80%;font-size:92px;line-height:1.02;text-transform:uppercase;letter-spacing:-.01em;color:#fff;padding:0 12px;border-radius:14px;-webkit-text-stroke:0;text-shadow:0 6px 0 rgba(0,0,0,.55),0 0 30px rgba(0,0,0,.35);display:inline-block',box,x.w);return s;});
   g.box=box;return g;});
@@ -672,6 +672,19 @@ SC.concept=p=>{const [bg,fg,hl,hl2]=CTH[p.bg||'ink'],f=FS(bg,p.bg==='hot'?'var(-
  return t=>{f.upd(t);u(t);};};
 SC.listCard=listCard;
 let UPD=null;
-window.setup=(name,p,dur)=>{S.innerHTML='';DUR=dur;UPD=SC[name](p);};
+// No pisar la cara: window.SAFE={face:[x0,y0,x1,y1],zones:[[y0,y1],…]} (layout.js). Si el gráfico armado (al final) se cruza con la cara,
+// se mueve entero a la zona libre donde entre más grande (y se achica si hace falta). Devuelve qué hizo, para el plan.
+function contentBox(){let r=null;for(const e of S.querySelectorAll('*')){const b=e.getBoundingClientRect();if(b.width<2||b.height<2||(b.width>=1000&&b.height>=1700))continue;
+  if(getComputedStyle(e).opacity==='0')continue;r=r?{left:Math.min(r.left,b.left),top:Math.min(r.top,b.top),right:Math.max(r.right,b.right),bottom:Math.max(r.bottom,b.bottom)}:{left:b.left,top:b.top,right:b.right,bottom:b.bottom};}
+ if(r){r.width=r.right-r.left;r.height=r.bottom-r.top;}return r;}
+function avoidFace(){const SF=window.SAFE;if(!SF||!SF.face)return null;const r=contentBox();if(!r)return null;const [fx0,fy0,fx1,fy1]=SF.face;
+ if(r.right<fx0||r.left>fx1||r.bottom<fy0||r.top>fy1)return {mode:'ok'};
+ let best=null;for(const [a,b] of SF.zones){const hz=b-a;if(hz<140)continue;const sc=Math.min(1,hz/r.height),top=a+(hz-r.height*sc)/2;
+   if(!best||sc>best.sc+.03||(Math.abs(sc-best.sc)<=.03&&Math.abs(top-r.top)<Math.abs(best.top-r.top)))best={sc,top};}
+ if(!best)return {mode:'sin lugar'};
+ S.style.transformOrigin=`${(r.left+r.right)/2}px ${r.top}px`;S.style.transform=`translateY(${best.top-r.top}px) scale(${best.sc})`;
+ return {mode:'movido',scale:+best.sc.toFixed(2),from:Math.round(r.top),to:Math.round(best.top)};}
+window.setup=(name,p,dur)=>{S.innerHTML='';S.style.transform='';DUR=dur;UPD=SC[name](p);
+ if(!p._place)return null;FRAME=0;UPD(Math.max(0,dur-.4));return avoidFace();};
 window.frame=(t,f)=>{FRAME=f;UPD(t);};
 </script></body></html>

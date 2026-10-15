@@ -19,6 +19,7 @@ Correr Python siempre con `python3 -I` (**Windows**: `py -3 -I`). Pasar rutas co
 2. Inventario de la carpeta: `ffprobe` de cada video (duración, fps, rotación, `nb_frames`), tamaño de los PNG, duración de los audios. El crudo suele ser 1920×1080 con rotación 90 (= vertical 1080×1920, 30 fps).
 3. Mirar el material de apoyo: `ffmpeg -vf "fps=2,scale=150:-1,tile=10x2"` → mirar la imagen. Identificar qué ilustra cada clip/foto (gancho, chiste, metáfora). Si hay escenas, detectar cortes con `scdet`.
 4. Mirar un cuadro del crudo (color de ropa → colores de subtítulos, ver escenas.md).
+5. **Dónde está la cara** (después de crear `config.json`, paso 3): `node $SK/scripts/face.js "<work>"` detecta la cara en 10 cuadros (Chrome FaceDetector) y guarda `config.face` {top, bottom, left, right}. Imprime la **decisión editorial de ubicación** y deja `<work>/face.png` (rojo = cara con el zoom máximo, verde = zonas libres, azul = subtítulos): **mirarla**. Si no detecta o se equivoca, estimarla mirando la imagen y poner `"face": {"top": …, "bottom": …, "left": …, "right": …, "manual": true}`.
 
 ## 1 · Transcribir
 `python3 -I $SK/scripts/transcribe.py "<crudo>" "<work>"` → lista de frases con tiempos.
@@ -32,7 +33,8 @@ Whisper alucina sobre ruido ("Gracias", "Gracias por ver el video", "Suscríbete
 - Escribir `<work>/segs.json`: lista de **segmentos lógicos** (cada uno = idea que comparte un gráfico), cada uno con frases `[a, b, "texto"]` tomadas de las frases de transcribe/check.
 
 ## 3 · Corte AJUSTADO (obligatorio)
-`python3 -I $SK/scripts/tighten.py "<work>"` recorta cada frase sobre la energía real de la voz y corta pausas internas ≥ 0,25 s (lecturas, miradas al costado, respiraciones). El usuario pidió explícitamente cortes sin silencios: **no dejar pausas**.
+`python3 -I $SK/scripts/tighten.py "<work>"` recorta cada frase sobre la energía real de la voz (esperando a que la última sílaba se apague del todo) y corta pausas internas ≥ 0,25 s (lecturas, miradas al costado, respiraciones). El usuario pidió explícitamente cortes sin silencios: **no dejar pausas**.
+**No comerse la última letra**: `edl.py` deja aire después de la voz: 0,14 s al final de cada frase (punto, coma, pregunta o cambio de segmento) y 0,08 s en los cortes internos (`config.post_pad_end` / `post_pad` para ajustar). Al verificar el corte re-transcripto, confirmar que la última palabra de cada frase está completa.
 Crear `<work>/config.json` (abajo) y correr `python3 -I $SK/scripts/edl.py "<work>"` → imprime la duración y los tiempos por segmento y **re-transcribe el corte**: confirmar que no falte ni sobre ninguna palabra. Si falta un arranque, revisar con check.py y ajustar segs.json.
 
 ```json
@@ -43,11 +45,11 @@ Crear `<work>/config.json` (abajo) y correr `python3 -I $SK/scripts/edl.py "<wor
   "broll": { "kl": {"path":"/abs/kling.mp4","frames":97,"rate":24,"w":1080,"h":1916},
              "s1": {"path":"/abs/foto.png","still":true,"w":941,"h":1672} },
   "music": {"path":"/abs/musica.wav"},
-  "face": {"top": 0.22},
+  "face": {"top": 0.22, "bottom": 0.55, "left": 0.25, "right": 0.75},
   "markers": [["HOOK",0],["CTA · Mandame un mensaje",17]] }
 ```
 `tail` = segundos extra al final (cara a cámara) para que se lea el último gráfico.
-`face.top` = altura (0–1) de la parte de arriba de la cabeza en el cuadro (mirarlo en el frame del paso 0.4): limita el zoom máximo para no cortarla. `music` lo completa `envato.py use` (o una ruta de la carpeta del video). Opcionales: `sfx_max` (máximo de SFX en toda la edición, default 5), `sound_design: "manual"`, `max_zoom`.
+`face` = caja de la cabeza en el cuadro (0–1), la completa `face.js` (paso 0.5); `face.top` además limita el zoom máximo para no cortarla. `music` lo completa `envato.py use` (o una ruta de la carpeta del video). Opcionales: `sfx_max` (máximo de SFX en toda la edición, default 5), `sound_design: "manual"`, `max_zoom`.
 
 ## 4 · Diseñar los motion graphics → `<work>/jobs.js`
 Basarse en `reference/ejemplo_jobs.js` y `reference/escenas.md`. Estilo fijo (al usuario le encantó, no cambiarlo): tarjetas crema con kicker mono y punto naranja, títulos Bricolage condensados en mayúsculas, resaltados naranja, ✓ lima, pantallas completas con grano y wipe en capas.
@@ -101,6 +103,13 @@ Para sumar sonidos nuevos: `python3 -I $SK/scripts/sfx_import.py <archivo> --id 
 `render.js` decide la escala de cada clip de V1 y la escribe en `framing.json`; el XML la aplica con keyframes:
 - `snap` (zoom rápido 100→118 %) en el gancho · `punch` (124 %) en las frases de énfasis: con `!`, con palabra clave en un clip corto, o bajo un sello/bigword (máx. uno cada 6 s) · `push` (acercamiento lento) en preguntas y en el CTA · `tight` (114 %) / `wide` (100→103 %) alternados para disimular los jump cuts (siempre ≥ 8 % de diferencia entre clips seguidos) · los clips tapados por fs o b-roll quedan en `wide`.
 - El zoom máximo sale de `config.face.top` (no corta la cabeza); default 124 %.
+
+## 4d · No pisar la cara (subtítulos y motion graphics)
+**Regla editorial: los subtítulos y los MG superpuestos nunca tapan la cara de quien habla** (las pantallas completas sí, a propósito, y lo que va sobre b-roll no importa porque la cara no se ve). Lo resuelve `layout.js` con `config.face` y el zoom máximo:
+- **Cara en posición normal** (aire arriba chico): subtítulos **abajo**, debajo del mentón (y≈1230 o más abajo si hace falta).
+- **Cara baja** (mucho aire arriba, cámara alta o persona hundida en el cuadro): subtítulos **arriba**, pegados sobre la cabeza.
+- **MG superpuestos** (`ov`/`ov2`): al renderizar se mide cada gráfico ya armado; si se cruza con la cara, se mueve entero (y se achica si no entra) a la zona libre más grande, arriba o abajo de la cara. El render lo informa (`cara: <id> movido (y 330→111, escala 100 %)`). Para dejar uno donde está a propósito: `free:true` en sus params.
+- Revisar en las hojas del paso 5 que ningún texto toque ojos ni boca; si algo queda raro, ajustar `y` del gráfico o `config.face` (manual).
 - Para forzar un encuadre: `F(seg, 'punch')` o `F.clip(i, 'wide')` en jobs.js.
 
 ## 5 · Dirección creativa, prueba y render

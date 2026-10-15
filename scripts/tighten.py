@@ -6,8 +6,11 @@ segs.json = lista de SEGMENTOS lógicos; cada segmento = lista de [a, b, "texto 
 uso: python3 -I tighten.py <workdir>      → <workdir>/tight.json
 Umbrales automáticos según el piso de ruido de la grabación.
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import wave,struct,math,json,subprocess,os,sys
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
+WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav')
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Corte ajustado',time.time()-_t0))
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
@@ -45,7 +48,7 @@ def regions(a,b):
     return merged
 def heard(a,b,prompt):
     f=os.path.join(W,'t.wav');subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.05)),'-to',str(b+0.05),'-i',A,f])
-    return subprocess.run(['whisper-cli','-m',MODEL,'-f',f,'-l','es','-np','-nt','--prompt',prompt],capture_output=True,text=True).stdout.strip().replace('\n',' ')
+    return subprocess.run([WHISPER,'-m',MODEL,'-f',f,'-l','es','-np','-nt','--prompt',prompt],capture_output=True,text=True).stdout.strip().replace('\n',' ')
 out=[]
 for si,seg in enumerate(SEG):
     for (a,b,txt) in seg:

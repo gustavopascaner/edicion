@@ -1,13 +1,11 @@
 // Paso 5: renderiza MG + subtítulos a .mov con alfa (QuickTime Animation).
 // uso: node render.js <workdir> [--only=<regex>] [--test] [--par=6]
-//   --test  : en vez de .mov, exporta PNGs de prueba a <workdir>/test (T=tiempos, ej T=end-0.4 o T=0.5,mid)
+//   --test  : en vez de .mov, exporta PNGs de prueba a <workdir>/test (--t=tiempos, ej --t=end-0.4 o --t=0.5,mid)
 // Lee <workdir>/config.json, edl.json y jobs.js (module.exports = ctx => { ...J(), B(), X()... }).
 const fs=require('fs'),path=require('path'),{spawn}=require('child_process');
 const ENG=path.join(__dirname,'..','engine');
 const puppeteer=require(path.join(ENG,'node_modules','puppeteer-core'));
-// Chrome/Chromium: variable CHROME o rutas habituales de macOS / Linux / Windows
-const CHROME=process.env.CHROME||['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser','C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'].find(p=>fs.existsSync(p));
+const {CHROME,fileURL,logTime}=require('./platform.js');
 const WD=path.resolve(process.argv[2]);
 const cfg=JSON.parse(fs.readFileSync(path.join(WD,'config.json')));
 const FPS=cfg.fps||30;
@@ -156,11 +154,11 @@ async function main(){
   const browser=await puppeteer.launch({executablePath:CHROME,headless:true,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
-    await page.goto('file://'+path.join(ENG,'engine.html'));await page.evaluate(()=>document.fonts.ready);
+    await page.goto(fileURL(path.join(ENG,'engine.html')));await page.evaluate(()=>document.fonts.ready);
     await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||null);
     while(qi<list.length){const j=list[qi++];const dur=j.end-j.start;const nf=Math.round(dur*FPS);
       try{await page.evaluate((j,dur)=>{if(j.p.tiles)j.p.tiles.forEach(t=>t.fmt=FMT[t.fmt]);setup(j.scene,j.p,dur);},j,dur);}catch(e){console.log('ERR',j.id,e.message.split('\n')[0]);continue;}
-      if(test){const ts=(process.env.T||'end-0.4').split(',');
+      if(test){const ts=((process.argv.find(a=>a.startsWith('--t='))||'').slice(4)||process.env.T||'end-0.4').split(',');
         for(const x of ts){let t=x==='mid'?dur/2:x.startsWith('end')?dur+parseFloat(x.slice(3)):parseFloat(x);if(isNaN(t))continue;
           await page.evaluate((t)=>frame(t,Math.round(t*30)),t);await page.screenshot({path:path.join(outFor(j),`${j.id}_t${t.toFixed(2)}.png`),omitBackground:true});}
         continue;}
@@ -178,4 +176,4 @@ if(process.argv.includes('--plan')){console.log(jobs.filter(j=>j.track!=='cap').
   console.log('SFX:\n'+sfx.map(x=>`  ${x.at.toFixed(2).padStart(6)}  ${x.id.padEnd(16)} gain ${x.gain}${x.auto?'  (auto)':''}`).join('\n'));
   console.log('Encuadres: '+framing.map(f=>`${f.i}:${f.mode}`).join(' '));}
 else{const t0=Date.now();main().then(()=>{const lab=process.argv.includes('--test')?'Render de prueba':process.argv.some(a=>a.includes('cap'))&&!process.argv.some(a=>a.includes('?!cap'))?'Render de subtítulos':'Render de motion graphics';
-  require('child_process').spawnSync('python3',['-I','-c',`import sys;sys.path.insert(0,${JSON.stringify(__dirname)});import timing;timing.log(${JSON.stringify(WD)},${JSON.stringify(lab)},${(Date.now()-t0)/1000})`]);}).catch(e=>{console.error(e);process.exit(1)});}
+  logTime(WD,lab,(Date.now()-t0)/1000);}).catch(e=>{console.error(e);process.exit(1)});}

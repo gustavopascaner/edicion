@@ -5,8 +5,11 @@ salida: <workdir>/audio16k.wav, <workdir>/pieces.json, imprime una línea por fr
 Ojo: Whisper alucina "Gracias", "Gracias por ver el video", "Suscríbete al canal", "CC por..." sobre ruido/respiraciones:
 verificar esas zonas con check.py antes de decidir.
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import re,subprocess,json,sys,os
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
+WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 src,W=sys.argv[1],sys.argv[2];os.makedirs(os.path.join(W,'sub'),exist_ok=True)
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Transcripción',time.time()-_t0))
 A=os.path.join(W,'audio16k.wav')
@@ -24,7 +27,7 @@ for a,b in big:
 if dur-prev>0.2: chunks.append((prev,dur))
 def tr(a,b,f,prompt=None):
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.08)),'-to',str(b+0.08),'-i',A,f])
-    cmd=['whisper-cli','-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t','8','-np']
+    cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t','8','-np']
     if prompt: cmd+=['--prompt',prompt]
     subprocess.run(cmd,capture_output=True);return open(f[:-4]+'.txt').read().strip().replace('\n',' ')
 res=[]

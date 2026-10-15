@@ -2,6 +2,8 @@
 """Paso 7: render de referencia MP4 con todo compuesto. uso: python3 -I preview.py <workdir>
 → <edit_dir>/<NAME>_v<N>_PREVIEW.mp4
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import json,os,subprocess,sys
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Vista previa',time.time()-_t0))

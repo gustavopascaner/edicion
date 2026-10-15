@@ -13,11 +13,26 @@ Qué hace:
 
 Las instrucciones para el agente están en [`SKILL.md`](SKILL.md).
 
-## Instalación (macOS)
+## Instalación
 
-Requisitos: Google Chrome, Node 18+, Python 3 y [Homebrew](https://brew.sh) (para `ffmpeg` y `whisper-cpp`).
+Funciona en **Windows** y **macOS**, con Codex o con Claude Code. No hace falta cuenta de GitHub. Antes de instalar, bajá `edicion-sfx.zip` (ver [Efectos de sonido](#efectos-de-sonido)).
+El instalador deja todo listo: instala lo que falte (Python, Node, FFmpeg, whisper.cpp, Google Chrome), descarga el modelo de Whisper (~1,6 GB), instala las dependencias, descomprime los sonidos, enlaza la skill en `~/.codex/skills/edicion` y `~/.claude/skills/edicion`, y al final muestra un chequeo con ✓/✗ de cada cosa.
 
-No hace falta cuenta de GitHub. Antes de instalar, bajá `edicion-sfx.zip` (ver [Efectos de sonido](#efectos-de-sonido)) y pasá su ruta al instalador.
+### Windows (PowerShell)
+
+Si no tenés Git: `winget install Git.Git` y abrí una terminal nueva.
+
+```powershell
+git clone https://github.com/gustavopascaner/edicion.git $HOME\skills\edicion
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File $HOME\skills\edicion\scripts\install.ps1 $HOME\Downloads\edicion-sfx.zip
+```
+
+Si al final algo figura con ✗, cerrá la terminal, abrí una nueva y volvé a correr el mismo comando (Windows necesita una terminal nueva para ver los programas recién instalados).
+
+### macOS
 
 ```bash
 git clone https://github.com/gustavopascaner/edicion.git ~/skills/edicion
@@ -27,7 +42,12 @@ git clone https://github.com/gustavopascaner/edicion.git ~/skills/edicion
 bash ~/skills/edicion/scripts/install.sh ~/Downloads/edicion-sfx.zip
 ```
 
-El instalador descomprime los sonidos en `assets/sfx/`, además enlaza la carpeta en `~/.claude/skills/edicion` (Claude Code) y `~/.codex/skills/edicion` (Codex), instala `ffmpeg`, `whisper-cpp` y las dependencias de node, y descarga el modelo de Whisper (~1,6 GB). Para actualizar: `git pull` en la carpeta clonada.
+Si falta Homebrew, el instalador lo instala (pide la contraseña de la Mac una vez).
+
+### Actualizar y chequear
+
+- Actualizar: `git pull` dentro de la carpeta clonada.
+- Chequear que esté todo: `python3 -I scripts/doctor.py` (Windows: `py -3 -I scripts\doctor.py`).
 
 ## Uso
 

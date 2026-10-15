@@ -8,6 +8,8 @@ uso:  python3 -I sfx_import.py <archivo.wav> --id ding-2 --cat ding [--anchor pe
       python3 -I sfx_import.py --list                  (muestra el catálogo)
 anchor: momento del sonido que cae justo en el evento (peak = golpe más fuerte, onset = arranque).
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import array,json,math,os,re,subprocess,sys
 SFX=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','assets','sfx');CAT=os.path.join(SFX,'catalog.json')
 TARGET=-16.0;CEIL=-1.0;SR=48000

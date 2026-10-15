@@ -1,7 +1,7 @@
 // Dirección creativa unificada: revisa que video, b-roll, gráficos, subtítulos, SFX y música no compitan entre sí.
 // uso: node director.js <workdir>   (después de `render.js --plan`)
 // → imprime el informe, lo guarda en <workdir>/direction.md y dibuja la línea de tiempo en <workdir>/timeline.png
-const fs=require('fs'),path=require('path');
+const fs=require('fs'),path=require('path'),{CHROME,fileURL,logTime}=require('./platform.js');
 const WD=path.resolve(process.argv[2]),rd=f=>JSON.parse(fs.readFileSync(path.join(WD,f)));
 const cfg=rd('config.json'),edl=rd('edl.json'),jobs=rd('jobs.json'),{broll}=rd('broll.json');
 const sfx=fs.existsSync(path.join(WD,'sfx.json'))?rd('sfx.json'):[],framing=fs.existsSync(path.join(WD,'framing.json'))?rd('framing.json'):[];
@@ -78,8 +78,7 @@ if(M){const tot=edl.total,hook=Math.min(Math.max(...edl.clips.filter(c=>c.seg===
 for(let s=0;s<=T;s+=5)html+=`<div style="position:absolute;left:${120+s*PX}px;top:400px;color:#777;font-size:10px">${s}s</div><div style="position:absolute;left:${120+s*PX}px;top:14px;height:380px;border-left:1px solid #222"></div>`;
 html+='</body></html>';fs.writeFileSync(path.join(WD,'timeline.html'),html);
 (async()=>{try{const puppeteer=require(path.join(__dirname,'..','engine','node_modules','puppeteer-core'));
-  const CHROME=process.env.CHROME||['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/Applications/Chromium.app/Contents/MacOS/Chromium','/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>fs.existsSync(p));
   const b=await puppeteer.launch({executablePath:CHROME,headless:true,args:['--allow-file-access-from-files']});const p=await b.newPage();
-  await p.setViewport({width:1640,height:430});await p.goto('file://'+path.join(WD,'timeline.html'));await p.screenshot({path:path.join(WD,'timeline.png')});await b.close();
+  await p.setViewport({width:1640,height:430});await p.goto(fileURL(path.join(WD,'timeline.html')));await p.screenshot({path:path.join(WD,'timeline.png')});await b.close();
   console.log('línea de tiempo:',path.join(WD,'timeline.png'));}catch(e){console.log('(no pude dibujar timeline.png:',e.message.split('\n')[0]+')');}
-  try{require('child_process').spawnSync('python3',['-I','-c',`import sys;sys.path.insert(0,${JSON.stringify(__dirname)});import timing;timing.log(${JSON.stringify(WD)},'Dirección creativa',${(Date.now()-t0)/1000})`]);}catch(e){}})();
+  logTime(WD,'Dirección creativa',(Date.now()-t0)/1000);})();

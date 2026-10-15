@@ -3,8 +3,11 @@
 uso: python3 -I edl.py <workdir> [--no-verify]   → <workdir>/edl.json (+ cut.wav y transcripción del corte)
 Lee config.json (fps, tail = segundos extra al final para que se lea el último gráfico).
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import json,os,sys,subprocess
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
+WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Línea de tiempo + verificación',time.time()-_t0))
 FPS=cfg.get('fps',30);PRE,POST=0.04,0.06;TAIL=cfg.get('tail',1.2)
@@ -41,4 +44,4 @@ if '--no-verify' not in sys.argv:
     cut=os.path.join(W,'cut.wav')
     subprocess.run(['ffmpeg','-v','error','-y','-i',os.path.join(W,'audio16k.wav'),'-/filter_complex',os.path.join(W,'fc_cut.txt'),'-map','[out]',cut],check=True)
     print('\n--- transcripción del corte (verificar que no falten palabras) ---')
-    print(subprocess.run(['whisper-cli','-m',MODEL,'-f',cut,'-l','es','-np','-t','8'],capture_output=True,text=True).stdout)
+    print(subprocess.run([WHISPER,'-m',MODEL,'-f',cut,'-l','es','-np','-t','8'],capture_output=True,text=True).stdout)

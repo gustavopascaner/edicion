@@ -12,6 +12,8 @@ uso:
   envato.py collect <work> [--from ~/Downloads] [--file <clave> <archivo>]  → reemplaza vistas previas por originales licenciados
   envato.py report <work>                          → tabla de procedencia (para el LEEME)
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import json,os,re,subprocess,sys,time,urllib.request,zipfile,shutil,math,array
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing

@@ -3,14 +3,19 @@
 Pistas: V1 video (alterna push-in 100→106% / punch-in 118%) · V2 b-roll · V3 subtítulos · V4 ov · V5 ov2 · V6 fs
         A1 diálogo · A2+ SFX/música.  Todo con rutas absolutas (file://localhost/...).
 """
-import json,os,shutil,sys,subprocess,time,urllib.parse
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
+import json,os,re,shutil,sys,subprocess,time,urllib.parse
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;T0=time.time()
 from xml.sax.saxutils import escape
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 EDIT=cfg['edit_dir'];SRC=cfg['src'];FPS=cfg.get('fps',30);NAME=cfg['name'];VER=cfg.get('version',1)
 edl=json.load(open(os.path.join(W,'edl.json')));jobs=json.load(open(os.path.join(W,'jobs.json')));br=json.load(open(os.path.join(W,'broll.json')))
 RATE=f'<rate><timebase>{FPS}</timebase><ntsc>FALSE</ntsc></rate>'
-def url(p): return 'file://localhost'+urllib.parse.quote(p)
+def url(p):   # macOS: file://localhost/Users/... · Windows: file://localhost/C%3a/Users/...
+    p=os.path.abspath(p).replace('\\','/')
+    if re.match(r'^[A-Za-z]:/',p): p='/'+p
+    return 'file://localhost'+urllib.parse.quote(p,safe='/')
 def fr(x): return int(round(x*FPS))
 def probe_frames(p): return int(float(subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',p],capture_output=True,text=True).stdout)*FPS)
 SRC_FRAMES=probe_frames(SRC)
@@ -118,5 +123,6 @@ def tc(f):
     ms=round(f/FPS*1000);return f'{ms//3600000:02d}:{ms//60000%60:02d}:{ms//1000%60:02d},{ms%1000:03d}'
 os.makedirs(os.path.join(EDIT,'Assets','Subtitulos'),exist_ok=True)
 open(os.path.join(EDIT,'Assets','Subtitulos',f'{NAME}_v{VER}_subtitulos.srt'),'w').write('\n'.join(f"{k}\n{tc(c['tl_in'])} --> {tc(c['tl_out'])}\n{c['text']}\n" for k,c in enumerate(edl['caps'],1)))
+import xml.dom.minidom;xml.dom.minidom.parse(out)   # valida que el XML esté bien formado
 print('XML',out,'· pistas de video',len([t for t in vtracks if t]),'· pistas SFX',len(st),'· duración %.1fs'%(edl['total']/FPS))
 timing.log(W,'XML para Premiere',time.time()-T0)

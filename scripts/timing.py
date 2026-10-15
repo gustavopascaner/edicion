@@ -3,6 +3,8 @@
 uso: python3 -I timing.py start <work>    (al empezar: marca el inicio)
      python3 -I timing.py report <work>   (al terminar: tiempo total + desglose; también lo guarda en timing.md)
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import json,os,sys,time
 def _p(W): return os.path.join(W,'timing.json')
 def _load(W):

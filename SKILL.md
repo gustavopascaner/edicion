@@ -11,11 +11,11 @@ Hablarle al usuario en español rioplatense (voseo). Avisarle brevemente el avan
 
 Rutas: `SK` = la carpeta de esta skill, donde está este SKILL.md (Claude Code: `~/.claude/skills/edicion`; Codex: `~/.codex/skills/edicion`) · scripts en `$SK/scripts` · motor en `$SK/engine/engine.html` · catálogo en `$SK/reference/escenas.md` · ejemplo en `$SK/reference/ejemplo_jobs.js`.
 Workdir del proyecto: `<carpeta>/<NAME>_EDIT/.work` (persistente, permite hacer v2 en otra sesión).
-Correr Python siempre con `python3 -I`. Pasar rutas con espacios entre comillas.
+Correr Python siempre con `python3 -I` (**Windows**: `py -3 -I`). Pasar rutas con espacios entre comillas. Funciona en macOS y Windows: en PowerShell usar rutas con `\`, `$env:VAR` en vez de `VAR=...` y los flags de los scripts (ej. `--t=end-0.4`) en vez de variables de entorno.
 
 ## 0 · Preparación
 0. **Cronómetro**: apenas se sabe el nombre, crear el workdir y correr `python3 -I $SK/scripts/timing.py start "<work>"`. Los scripts anotan solos cuánto tarda cada paso.
-1. Dependencias: `which ffmpeg whisper-cli` (si faltan: `brew install ffmpeg whisper-cpp`). Modelo: `~/.cache/whisper-cpp/ggml-large-v3-turbo.bin` (si falta, descargar de `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin`). Google Chrome instalado (o la variable `CHROME` con la ruta al ejecutable). `$SK/engine/node_modules` (si falta: `cd $SK/engine && npm ci`).
+1. Dependencias: `python3 -I $SK/scripts/doctor.py` (Windows: `py -3 -I $SK\scripts\doctor.py`). Si algo sale con ✗, correr el comando que indica (en general el instalador: `bash $SK/scripts/install.sh` en Mac, `powershell -ExecutionPolicy Bypass -File $SK\scripts\install.ps1` en Windows) y volver a chequear.
 2. Inventario de la carpeta: `ffprobe` de cada video (duración, fps, rotación, `nb_frames`), tamaño de los PNG, duración de los audios. El crudo suele ser 1920×1080 con rotación 90 (= vertical 1080×1920, 30 fps).
 3. Mirar el material de apoyo: `ffmpeg -vf "fps=2,scale=150:-1,tile=10x2"` → mirar la imagen. Identificar qué ilustra cada clip/foto (gancho, chiste, metáfora). Si hay escenas, detectar cortes con `scdet`.
 4. Mirar un cuadro del crudo (color de ropa → colores de subtítulos, ver escenas.md).
@@ -105,11 +105,11 @@ Para sumar sonidos nuevos: `python3 -I $SK/scripts/sfx_import.py <archivo> --id 
 ## 5 · Dirección creativa, prueba y render
 1. `node $SK/scripts/render.js "<work>" --plan` (lista los gráficos, SFX y encuadres con tiempos; detecta palabras no encontradas).
 2. **Dirección creativa**: `node $SK/scripts/director.js "<work>"` → informe (`direction.md`) + línea de tiempo (`timeline.png`, mirarla). Revisa que nada compita: más de 3 MG o de 3 pantallas completas, subtítulos visibles debajo de un MG, dos tarjetas a la vez, tarjetas tapando el b-roll, b-roll bajo una pantalla completa o en el CTA, pantallas completas muy seguidas o muy largas, cara visible < 55 %, tramos de más de 15 s sin ningún evento, más de 5 SFX o SFX a menos de 3 s entre sí, jump cuts sin cambio de encuadre, material de Envato sin licenciar. **Corregir todos los ⚠️** en jobs.js / config.json y repetir 1–2 hasta que quede limpio (o justificar en el LEEME los que se dejan a propósito).
-3. `T=end-0.4 node $SK/scripts/render.js "<work>" --test --only='^(?!cap)'` y luego `python3 -I $SK/scripts/sheets.py "<work>"` → **mirar las hojas (imágenes)** y corregir: textos cortados, superposiciones, elementos tapando lo importante del b-roll, timing (que el gráfico termine de armarse antes de salir).
+3. `node $SK/scripts/render.js "<work>" --test --t=end-0.4 --only='^(?!cap)'` y luego `python3 -I $SK/scripts/sheets.py "<work>"` → **mirar las hojas (imágenes)** y corregir: textos cortados, superposiciones, elementos tapando lo importante del b-roll, timing (que el gráfico termine de armarse antes de salir).
 4. Render final (en segundo plano, tarda unos minutos): `node $SK/scripts/render.js "<work>" --only='^(?!cap)'` y después `node $SK/scripts/render.js "<work>" --only='^cap'`. Los SFX se copian a `Assets/SFX` al armar el XML.
 
 ## 6 · XML + entrega
-- `python3 -I $SK/scripts/build_xml.py "<work>"` y `xmllint --noout <xml>` (también genera el `.srt`).
+- `python3 -I $SK/scripts/build_xml.py "<work>"` (valida el XML y también genera el `.srt`).
 - **No correr `preview.py`** salvo que el usuario pida explícitamente la vista previa. La revisión de gráficos ya se hizo con las hojas del paso 5; si hay que corregir algo, volver a renderizar solo ese job con `--only='^id$'` y regenerar el XML.
 - **Tiempo**: `python3 -I $SK/scripts/timing.py report "<work>"` → tiempo total de procesamiento y desglose por paso (también queda en `<work>/timing.md`).
 - Escribir `LEEME.md` en `<NAME>_EDIT/`: cómo importar (Archivo → Importar → XML; no mover la carpeta), tabla de pistas, estructura, qué se sacó, CTAs alternativos con timecodes, **material de Envato** (salida de `envato.py report`, con lo que falte licenciar), resumen de la dirección creativa, **tiempo de procesamiento**, y para revisar (Cmd+Shift+D para crossfades de audio, SRT nativo opcional).
@@ -119,7 +119,7 @@ Para sumar sonidos nuevos: `python3 -I $SK/scripts/sfx_import.py <archivo> --id 
 Si el usuario pide cambios sobre una edición existente: reusar `<NAME>_EDIT/.work`, subir `version` en config.json y apuntar `edit_dir` a `<NAME>_EDIT_v2` (para no pisar la v1), editar segs.json/jobs.js, y repetir desde el paso 3. Arrancar un cronómetro nuevo (`timing.py start`) para la versión. Dejar la versión anterior intacta.
 
 ## Notas técnicas
-- Compatible con Claude Code y Codex: todas las rutas son relativas a `$SK`; no depende de herramientas propias de ningún agente.
+- Compatible con Claude Code y Codex, en macOS y Windows: todas las rutas son relativas a `$SK`; no depende de herramientas propias de ningún agente. En Windows, whisper-cli queda en `%LOCALAPPDATA%\whisper-cpp` (o la variable `WHISPER_CLI`) y Chrome se busca en las rutas habituales (o la variable `CHROME`). El XML usa rutas `file://localhost/C%3a/...` que Premiere para Windows lee bien.
 - XML FCP7 (xmeml v4): clipitems a la base de tiempo de la secuencia (30), archivos con su propia `rate` (kling = 24). En macOS, los nombres con tildes suelen estar en NFD: armar las rutas listando el directorio (`os.listdir`), no tipeándolas.
 - No usar `rm -rf` con globs relativos (lo bloquea el sistema). Usar carpetas nuevas o rutas absolutas.
 - Los MG con grano a pantalla completa pesan (QuickTime Animation); es normal que `Assets/MG` ocupe cientos de MB.

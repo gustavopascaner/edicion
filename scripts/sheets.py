@@ -3,6 +3,8 @@
 uso: python3 -I sheets.py <workdir>     (usa <workdir>/bg.png; lo extrae del crudo si no existe)
 → <workdir>/sheets/sNN.png  (leerlas con Read para revisar diseño)
 """
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import os,sys,subprocess,glob,json
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Hojas de prueba',time.time()-_t0))

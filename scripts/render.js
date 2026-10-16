@@ -150,6 +150,10 @@ fs.writeFileSync(path.join(WD,'jobs.json'),JSON.stringify(jobs,null,1));
 fs.writeFileSync(path.join(WD,'broll.json'),JSON.stringify({broll,extraSfx},null,1));
 fs.writeFileSync(path.join(WD,'sfx.json'),JSON.stringify(sfx.sort((a,b)=>a.start-b.start),null,1));
 
+const CONCEPT_JS=path.join(WD,'concept.js'),LEGACY=jobs.some(j=>j.scene==='concept'&&j.p.motif);
+if(jobs.some(j=>j.scene==='concept')){
+  if(LEGACY)console.warn('⚠️  La pantalla conceptual usa un motivo viejo (`motif`): es una animación reciclada. Escribir una nueva en concept.js (ver SKILL.md paso 4).');
+  else if(!fs.existsSync(CONCEPT_JS))console.warn(`⚠️  Falta ${CONCEPT_JS}: la pantalla conceptual se diseña y programa desde cero para cada video.`);}
 async function main(){
   if(!CHROME)throw new Error('No encuentro Chrome. Instalalo o definí CHROME=/ruta/al/ejecutable');
   const only=process.argv.find(a=>a.startsWith('--only='));const test=process.argv.includes('--test');
@@ -163,6 +167,9 @@ async function main(){
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
     await page.goto(fileURL(path.join(ENG,'engine.html')));{const k=await BRAND.apply(page,BR);if(k&&k<.98&&!FIT_SAID){FIT_SAID=1;console.log(`marca: la tipografía de títulos es más ancha que la del motor → títulos al ${Math.round(k*100)} %`);}}await page.evaluate(()=>document.fonts.ready);
     await page.evaluate(L=>{window.SAFE=L.face?L:null;},LAY);
+    // animación conceptual de ESTE video (escrita desde cero) · los motivos viejos solo si una edición vieja usa `motif`
+    if(fs.existsSync(CONCEPT_JS))await page.addScriptTag({path:CONCEPT_JS});
+    if(LEGACY)await page.addScriptTag({path:path.join(__dirname,'..','reference','concept_ejemplos.js')});
     await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||(BR?BRAND.captionColors(BR):null));
     while(qi<list.length){const j=list[qi++];const dur=j.end-j.start;const nf=Math.round(dur*FPS);
       try{const pl=await page.evaluate((j,dur)=>{if(j.p.tiles)j.p.tiles.forEach(t=>t.fmt=FMT[t.fmt]);return setup(j.scene,j.p,dur);},j,dur);

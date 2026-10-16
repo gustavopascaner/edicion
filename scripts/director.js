@@ -1,7 +1,14 @@
 // Dirección creativa unificada: revisa que video, b-roll, gráficos, subtítulos, SFX y música no compitan entre sí.
-// uso: node director.js <workdir>   (después de `render.js --plan`)
+// uso: node director.js <workdir>   (después de `render.js --plan`) · node director.js --conceptos (historial de animaciones conceptuales)
 // → imprime el informe, lo guarda en <workdir>/direction.md y dibuja la línea de tiempo en <workdir>/timeline.png
 const fs=require('fs'),path=require('path'),{CHROME,fileURL,logTime}=require('./platform.js');
+// Historial de animaciones conceptuales (una por video, nunca recicladas): ~/.config/edicion/conceptos.jsonl
+const os=require('os'),crypto=require('crypto');
+const HIST=path.join(os.homedir(),'.config','edicion','conceptos.jsonl');
+const readHist=()=>fs.existsSync(HIST)?fs.readFileSync(HIST,'utf8').split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean):[];
+if(process.argv[2]==='--conceptos'){const h=readHist();
+  console.log(h.length?'Animaciones conceptuales ya usadas (no repetir la metáfora):\n'+h.slice(-20).map(e=>`  ${e.date}  ${e.video.padEnd(22)} ${e.metafora}  ← ${e.idea}`).join('\n'):'Todavía no hay animaciones conceptuales en el historial.');
+  process.exit(0);}
 const WD=path.resolve(process.argv[2]),rd=f=>JSON.parse(fs.readFileSync(path.join(WD,f)));
 const cfg=rd('config.json'),edl=rd('edl.json'),jobs=rd('jobs.json'),{broll}=rd('broll.json');
 const sfx=fs.existsSync(path.join(WD,'sfx.json'))?rd('sfx.json'):[],framing=fs.existsSync(path.join(WD,'framing.json'))?rd('framing.json'):[];
@@ -24,7 +31,27 @@ for(const b of B)if(b.start>=cta-0.1)W(`B-roll "${b.src}" cae en el CTA final: d
 if(B.length&&B.length<3)W(`Hay ${B.length} b-roll(s): el objetivo son 3 momentos (inicio, medio, antes del CTA).`);
 if(B.length>=2){const s=B.map(b=>b.start).sort((a,b)=>a-b);if(s[s.length-1]-s[0]<T*0.35)W('Los b-rolls están amontonados: repartirlos a lo largo del video.');}
 for(const f of fsj){const d=f.end-f.start;if(f.scene==='concept'){if(d<2.8||d>4.6)W(`Pantalla conceptual ${f.id} dura ${f2(d)}: ideal 3–4 s.`);}else if(d<0.8||d>3.6)W(`Pantalla completa ${f.id} dura ${f2(d)}: ideal 1–3 s.`);}
-{const cc=fsj.filter(f=>f.scene==='concept');(cc.length?O:W)(cc.length?`Pantalla conceptual sin texto: ${cc.map(f=>f.p.motif).join(', ')}.`:'Falta la pantalla conceptual sin texto (escena "concept", 3–4 s): una de las 3 pantallas completas tiene que ilustrar un concepto con formas animadas.');}
+{const cc=fsj.filter(f=>f.scene==='concept');
+ if(!cc.length)W('Falta la pantalla conceptual sin texto (escena "concept", 3–4 s): una de las 3 pantallas completas tiene que ilustrar un concepto con una animación nueva (concept.js).');
+ else if(cc.some(f=>f.p.motif))W(`Pantalla conceptual reciclada (motivo viejo "${cc.find(f=>f.p.motif).p.motif}"): diseñar y programar una animación nueva para este video en concept.js.`);
+ else{const cj=path.join(WD,'concept.js');
+  if(!fs.existsSync(cj))W('Falta concept.js: la animación conceptual se programa desde cero para cada video.');
+  else{const src=fs.readFileSync(cj,'utf8'),hd=k=>(src.match(new RegExp('^\\s*//\\s*'+k+'\\s*:\\s*(.+)$','mi'))||[])[1]?.trim()||'';
+   const idea=hd('IDEA'),met=hd('MET[AÁ]FORA'),beats=hd('BEATS');
+   if(!idea||!met||!beats)W('concept.js no tiene el encabezado completo (// IDEA: … // METÁFORA: … // BEATS: …): escribir la idea antes de programarla.');
+   const code=src.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,''),hash=crypto.createHash('sha1').update(code).digest('hex').slice(0,12);
+   const legacy=path.join(__dirname,'..','reference','concept_ejemplos.js');
+   if(fs.existsSync(legacy)){const lc=fs.readFileSync(legacy,'utf8').replace(/\/\/.*$/gm,'').replace(/\s+/g,'');
+     const copied=lc.split(/MOT\.\w+=/).slice(1).map(b=>b.slice(0,100)).filter(b=>b.length>=100&&code.includes(b));
+     if(copied.length)W('concept.js copia código de un motivo viejo de concept_ejemplos.js: la animación tiene que ser nueva.');}
+   const nW=warn.length,prev=readHist().filter(e=>e.video!==cfg.name);
+   const dup=prev.find(e=>e.hash===hash);if(dup)W(`concept.js es idéntico al de "${dup.video}" (${dup.date}): diseñar una animación nueva.`);
+   const stop=new Set('de la el los las un una que con por para en y o a se al del sus su lo como mas más'.split(' '));
+   const kw=x=>new Set(x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z]+/).filter(w=>w.length>3&&!stop.has(w)));
+   const mk=kw(met);for(const e of prev.slice(-10)){const rep=[...kw(e.metafora||'')].filter(w=>mk.has(w));if(rep.length>=2)W(`La metáfora se parece a la de "${e.video}" (${e.metafora}): buscar otra imagen.`);}
+   if(warn.length===nW)O(`Pantalla conceptual nueva: ${met||'(sin metáfora)'} — ${idea||'(sin idea)'}.`);
+   if(idea&&met){const h=readHist().filter(e=>e.video!==cfg.name);h.push({video:cfg.name,date:new Date().toISOString().slice(0,10),idea,metafora:met,hash});
+     fs.mkdirSync(path.dirname(HIST),{recursive:true});fs.writeFileSync(HIST,h.map(e=>JSON.stringify(e)).join('\n')+'\n');}}}}
 const fss=fsj.map(f=>f.start).sort((a,b)=>a-b);
 for(let i=1;i<fss.length;i++)if(fss[i]-fss[i-1]<6)W(`Pantallas completas muy seguidas (${f2(fss[i-1])} y ${f2(fss[i])}): espaciarlas ≥ 6 s.`);
 const FSM=cfg.fs_max??3,MGM=cfg.mg_max??3,nOv=ov.length+ov2.length;

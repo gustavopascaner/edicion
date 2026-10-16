@@ -47,7 +47,7 @@ Helper `H('texto')` = resaltado naranja dentro de líneas `disp`.
 | `letter` | `n, l, word, wsize?, sub, light?, bg, accent` — intro de cada letra del método |
 | `recap` | — IDEAS completo |
 | `speed` | — velocímetro "PISAMOS EL ACELERADOR" |
-| `concept` | `motif, at, bg:'ink'\|'hot'\|'paper', seed?, n?, top?, grid:false?` — **sin texto, 3–4 s** — animación conceptual con formas, líneas y partículas (obligatoria: una de las 3 fs). Motivos abajo. |
+| `concept` | `at, bg:'ink'\|'hot'\|'paper', seed?, top?, grid:false?` + lo que lea tu `concept.js` — **sin texto, 3–4 s** — animación conceptual **nueva para cada video**, programada en `<work>/concept.js` (obligatoria: una de las 3 fs). Ver abajo. |
 
 ## Subtítulos
 Automáticos (un .mov por clip de V1). Palabra activa resaltada; `config.keywords` = palabras clave con color propio.
@@ -60,23 +60,19 @@ Escribir `SC.nombre=p=>{ ...construir DOM con h(), ml(), kick()...; return t=>{ 
 Helpers: `P(t,a,d)` progreso 0–1 · `E.expo/back/el/o3/io` easings · `rise(el,t,a)` máscara que sube · `popIn(el,t,a)` · `OV(card)` entrada/salida de tarjeta · `FS(bg,accent)` wipe de pantalla completa · `DUR` duración.
 Siempre incluir salida en los últimos 0.3 s. Revisar con `--test` + sheets.py antes del render final.
 
-## Motivos de `concept` (animaciones sin texto)
-Todos usan los colores del fondo elegido (`bg`: ink → crema + naranja, hot → tinta + lima, paper → tinta + naranja) y tienen un **momento clave** en `at` (default: mitad de la escena, máx. 1,8 s), que conviene sincronizar con la palabra del concepto.
-| motivo | qué muestra | para ideas como |
-|---|---|---|
-| `growth` | barras que suben + línea de tendencia + punto que late | crecer, mejorar, resultados, más pacientes |
-| `network` | nodos que aparecen y se conectan con un centro que se enciende | comunidad, recomendaciones, contactos, sistema |
-| `cycle` | flechas en círculo que giran y aceleran | hábitos, repetir, constancia, proceso continuo |
-| `funnel` | muchas partículas entran a un embudo y pasan pocas | filtrar, elegir, conversión, los correctos |
-| `target` | anillos concéntricos y un dardo que da en el centro | objetivo, foco, precisión, público ideal |
-| `balance` | balanza que oscila y se equilibra | equilibrio, decisión, comparar, justo |
-| `breakthrough` | pelota que rompe una pared de bloques | superar un obstáculo, romper una barrera |
-| `order` | puntos caóticos que se ordenan en una grilla | orden, método, sistema, claridad |
-| `pulse` | electrocardiograma que se dibuja + corazón que late | salud, vida, cuidado, emoción |
-| `path` | camino curvo con un marcador que llega a la bandera | recorrido, proceso, meta, paso a paso |
-| `attract` | partículas atraídas hacia un centro que crece | atraer pacientes, magnetismo, interés |
-| `dialog` | dos personas, ondas de ida y vuelta y aparece un corazón | escuchar, comunicar, vínculo, empatía |
-| `split` | camino que se bifurca; uno se apaga y el otro se resalta | elegir, decisión, el camino correcto |
-| `stack` | bloques que caen y forman una torre | construir, acumular, paso a paso, base |
+## Animación conceptual (`concept`): una nueva por video
+No hay motivos prearmados: cada video trae su propia animación en `<work>/concept.js`, que `render.js` carga en el motor. Los 14 motivos viejos están en `reference/concept_ejemplos.js` **solo como referencia técnica** (no copiarlos ni adaptarlos; el director avisa si se reusa código o metáfora).
 
-Nuevo motivo: `MOT.nombre=(g,p,a,D,r)=>{ …dibujar con sv('circle'|'path'|'line'|…, attrs, g, css)… return t=>{…} }` en un lienzo SVG de 1000×1000 (zona visible ≈110–890). Helpers: `spop` (aparecer), `dash` (dibujar líneas), `ripple` (onda), `r()` aleatorio con semilla. Colores solo con `FG`, `HL`, `HL2`, `SUB`. Probar con `--test --at=0.5,<at>,end`.
+```js
+// IDEA: <qué frase/idea del guion ilustra>
+// METÁFORA: <la imagen, en una línea — nueva, no usada antes (node director.js --conceptos)>
+// BEATS: 1) planteo … 2) momento clave en `a` (palabra '…') … 3) resolución …
+window.CONCEPT=(g,p,a,D,r)=>{
+  // g = <svg> 1000×1000 (zona visible ≈ 110–890) · p = params del job · a = momento clave (s locales) · D = duración · r() = azar con semilla
+  const core=sv('circle',{cx:500,cy:500,r:60},g,`fill:${HL}`);
+  return t=>{ spop(core,t,.1); /* … */ };
+};
+```
+**Colores**: solo `FG` (figura), `HL` (resaltado), `HL2`, `SUB` (líneas tenues): se adaptan al fondo (`bg` ink → crema + naranja, hot → tinta + lima, paper → tinta + naranja) y a la marca.
+**Herramientas**: `sv(tag, attrs, padre, css)` crear SVG · `P(t,a,d)` progreso 0–1 · `E.back/el/o3/io/expo` easings · `L(a,b,x)` interpolar · `cl(x)` limitar 0–1 · `spop(el,t,a)` aparecer con rebote · `dash(el,largo,x)` dibujar un trazo · `ripple(g,cx,cy)` onda · `along(path,x)` punto sobre un path · `lerpPt(p,q,x)` · `particles(g,n,r,{r,fill,box})` nube de partículas.
+**Checklist**: se entiende sin texto en 3 s · una sola idea, un solo momento fuerte (en `a`, sincronizado con la palabra) · arranca armándose (no aparece todo junto) · se mueve hasta el final (nada congelado) · salida en los últimos 0,3 s · composición centrada que llena el cuadro · probar con `--test --only='concept' --t=0.3,<at>,end-0.4` y mirar los PNG.

@@ -4,10 +4,10 @@
 //      S(sfx,segundo,{gain,dur}) sonido suelto de la librería · B(clave_broll,seg_origen,inicio,dur,[kb0,kb1]) · X(audio_abs,inicio,dur,gain,seg_origen)
 //      W(seg,'palabra',n) · C(seg) inicio · CE(seg) fin · R(s,t) relativo · H(txt) resaltado
 module.exports=({J,B,X,S,F,W,C,CE,R,H,cfg,edl,FPS})=>{
-// La música (config.music) y su volumen (gancho fuerte → fondo bajo → cierre) los arma build_xml.py: no hace falta X().
-// 0 · GANCHO: cara → b-roll kling del médico revoleando el cartel + sticker con flecha + música fuerte
+// La música (config.music) y su volumen (parejo todo el video, fade-out final) los arma build_xml.py: no hace falta X().
+// 0 · GANCHO: cara → b-roll kling del médico revoleando el cartel + sticker con flecha (sin SFX: el video no arranca con un efecto)
 {const k0=W(0,'tenes')-.05,e=CE(0);
- J('01_hook_medico','sticker','ov',C(0)+.05,k0,{kick:'SI SOS',text:'MÉDICO<br>ESPECIALISTA',size:130,y:260,aw:1},'pop');
+ J('01_hook_medico','sticker','ov',C(0)+.05,k0,{kick:'SI SOS',text:'MÉDICO<br>ESPECIALISTA',size:130,y:260,aw:1},null);
  B('kl',0,k0,Math.min(4.03,e-k0));
  J('02_hook_loco','sticker','ov',k0,e,{kick:'SÍ, COMO ESTE',text:'LOCO',size:170,x:70,y:240,ax:230,ay:180,aw:260},'whoosh');}
 // 1 · sello + foto con Ken Burns

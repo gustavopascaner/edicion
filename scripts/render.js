@@ -33,7 +33,7 @@ function pick(spec){
   const ids=rotating.length?rotating:all;if(!ids.length&&CAT.sounds[spec])return spec;
   if(!ids.length)throw new Error(`SFX "${spec}" no existe (ni categoría ni id). Ver: python3 -I scripts/sfx_import.py --list`);
   let k=(rot[spec]=(rot[spec]??-1)+1)%ids.length;if(ids.length>1&&ids[k]===last.id)k=(k+1)%ids.length;return ids[k];}
-// S(spec, segundo del evento, {gain, dur}) → pone un sonido de la librería en la línea de tiempo (manual: nunca se descarta)
+// S(spec, segundo del evento, {gain, dur}) → pone un sonido de la librería en la línea de tiempo (manual: no se descarta, salvo en los primeros cfg.sfx_start s)
 const ev=[];
 function S(spec,t,o={}){ev.push({spec,t,o,manual:true});}
 // J(id, escena, pista: 'ov'|'ov2'|'fs', inicio, fin, params, sfx)
@@ -90,18 +90,20 @@ const AUTO={
   metrics:p=>[['whoosh',0],...each(p.tiles,t=>A('pop',t.at)),A('hit',p.stampAt)], calendar:p=>[['whoosh',0],A('pop',p.qAt)],
 };
 // Pocos sonidos y sutiles: como máximo cfg.sfx_max (default 5) en TODA la edición, elegidos por importancia
-// (remates y pantallas completas > gancho > CTA > b-roll > tarjetas > detalles internos) y bien separados entre sí.
+// (remates y pantallas completas > CTA > b-roll > tarjetas > detalles internos) y bien separados entre sí.
+// El video NUNCA arranca con un efecto (pedido del usuario): nada antes de cfg.sfx_start (default 1,5 s), ni automático ni manual.
 const T_=edl.total/FPS,lastSeg=Math.max(...edl.clips.map(c=>c.seg)),ctaT=edl.clips.find(c=>c.seg===lastSeg).tl_in/FPS;
-const firstJob=userJobs.filter(j=>j.track!=='cap').sort((a,b)=>a.start-b.start)[0];
+const NO_SFX_START=cfg.sfx_start??1.5;
 if(cfg.sound_design!=='manual'){
   for(const j of userJobs){if(j.sfx!=='auto'||j.track==='cap')continue;
     const rule=AUTO[j.scene]||(j.track==='fs'?()=>[['whoosh',0]]:()=>[['pop',0]]);
     for(const e of rule(j.p).filter(Boolean)){if(!(e[1]>=0&&e[1]<j.end-j.start-0.15))continue;
       const entry=e[1]===0,strongScene=/bigword|stamp/.test(j.scene);
-      const score=entry?(j.track==='fs'?(strongScene?11:10):strongScene?9:j===firstJob&&j.start<1.5?9:j.start>=ctaT-0.1?7:4)
+      const score=entry?(j.track==='fs'?(strongScene?11:10):strongScene?9:j.start>=ctaT-0.1?7:4)
                        :(e[0]==='hit'?8:e[0]==='error'?1:2);
       ev.push({spec:e[0],t:j.start+e[1],o:{},score});}}
   for(const b of broll)ev.push({spec:'whoosh',t:b.start,o:{},score:6});}
+for(let i=ev.length-1;i>=0;i--)if(ev[i].t<NO_SFX_START){if(ev[i].manual)console.warn(`⚠️  SFX manual en ${ev[i].t.toFixed(2)}s descartado: el video no arranca con un efecto (nada antes de ${NO_SFX_START}s).`);ev.splice(i,1);}
 const MAX=cfg.sfx_max??5,SEP=Math.max(3,Math.min(7,T_/(MAX+1))),kept=ev.filter(e=>e.manual);
 if(kept.length>MAX)console.warn(`⚠️  Hay ${kept.length} SFX manuales y el máximo es ${MAX}: sacar algunos.`);
 for(const e of ev.filter(e=>!e.manual).sort((a,b)=>b.score-a.score||a.t-b.t)){

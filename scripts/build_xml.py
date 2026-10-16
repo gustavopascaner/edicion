@@ -57,7 +57,9 @@ for c in edl['clips']:
           f'<link><linkclipref>{aid}</linkclipref><mediatype>audio</mediatype><trackindex>1</trackindex><clipindex>{i+1}</clipindex><groupindex>1</groupindex></link>')
     nm=f'{i:02d} · '+c['text'][:40]
     v1.append(clip(vid,nm,file_el('file-src',SRC,SRC_FRAMES,True,True),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],SRC_FRAMES,mot+link))
-    a1.append(clip(aid,nm,file_el('file-src',SRC,SRC_FRAMES,True,True),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],SRC_FRAMES,link,srctrack=1))
+    # config.voice_gain_db: ganancia de la voz del crudo (crudos grabados muy bajos)
+    vg=(level(round(10**(cfg['voice_gain_db']/20),4)) if cfg.get('voice_gain_db') else '')
+    a1.append(clip(aid,nm,file_el('file-src',SRC,SRC_FRAMES,True,True),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],SRC_FRAMES,link+vg,srctrack=1))
 v2=[]
 for b in br['broll']:
     m=cfg['broll'][b['src']];p=m['path'];s=fr(b['start']);n=fr(b['dur'])
@@ -96,13 +98,13 @@ for x in sfx:
 for x in br['extraSfx']:
     p=x['file'];s=fr(x['start']);n=fr(x['dur']);cin=fr(x['sin']);fd=probe_frames(p)
     put(clip(nid('sfx'),os.path.basename(p),file_el('f-x-'+p,p,fd,False,True),s,s+n,cin,cin+n,fd,level(x['gain']),srctrack=1),s,s+n)
-# Música (config.music = {path, dur, hook_gain, bed_gain, outro_gain, offset}): fuerte en el gancho, baja bajo la voz, sube en el cierre
+# Música (config.music = {path, dur, bed_gain, offset}): volumen PAREJO todo el video (pedido del usuario: ni más alta al principio ni al final), solo fade-out final
 mtrack=[];M=cfg.get('music')
 if isinstance(M,dict) and M.get('path'):
     tot=edl['total'];mf=fr(M.get('dur') or probe_frames(M['path'])/FPS);off=fr(M.get('offset',0));n=min(tot,mf-off)
-    seg0=max(c['tl_out'] for c in edl['clips'] if c['seg']==0);hook=min(seg0,fr(3.5));speech=max(hook+fr(1),tot-fr(cfg.get('tail',1.2)))   # el último clip incluye la cola (tail) sin voz
-    hg,bg,og=M.get('hook_gain',.3),M.get('bed_gain',.08),M.get('outro_gain',.22)
-    kf=[(0,hg),(hook,hg),(hook+fr(.6),bg),(speech,bg),(min(n,speech+fr(.4)),og),(max(0,n-fr(.8)),og),(n,0.0001)]
+    bg=M.get('bed_gain',.08)
+    if 'hook_gain' in M or 'outro_gain' in M: print('ℹ️  hook_gain/outro_gain se ignoran: la música va pareja en bed_gain todo el video')
+    kf=[(0,bg),(max(0,n-fr(.8)),bg),(n,0.0001)]
     kf=[(w,g) for k,(w,g) in enumerate(kf) if k==0 or w>kf[k-1][0]]
     lv=('<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype>'
         '<parameter><parameterid>level</parameterid><name>Level</name><valuemin>0.00001</valuemin><valuemax>31.6228</valuemax><value>'+str(bg)+'</value>'

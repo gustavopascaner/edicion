@@ -75,9 +75,10 @@ if(!evs.length||evs[0]>1.0)W('Nada visual en el primer segundo: el gancho necesi
 const hits=sfx.filter(x=>x.cat==='hit');for(let i=1;i<hits.length;i++)if(hits[i].at-hits[i-1].at<4)W(`Dos golpes (hit) a menos de 4 s (${f2(hits[i-1].at)} y ${f2(hits[i].at)}): pierden fuerza.`);
 for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<0.25&&sfx[i].cat!=='build'&&sfx[i-1].cat!=='build')W(`SFX encimados en ${f2(sfx[i].at)}: ${sfx[i-1].id} + ${sfx[i].id}.`);
 const SMAX=cfg.sfx_max??5;(sfx.length>SMAX?W:O)(`SFX: ${sfx.length} en toda la edición (máximo ${SMAX})${sfx.length>SMAX?' — sacar los menos importantes':''}: ${sfx.map(x=>x.id+' '+f2(x.at)).join(' · ')}.`);
+for(const x of sfx)if(x.at<(cfg.sfx_start??1.5))W(`SFX ${x.id} en ${f2(x.at)}: el video no tiene que arrancar con un efecto (nada antes de ${cfg.sfx_start??1.5} s).`);
 for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<3)W(`SFX muy cerca (${f2(sfx[i-1].at)} y ${f2(sfx[i].at)}): separarlos ≥ 3 s para que sea sutil.`);
 const M=cfg.music&&typeof cfg.music==='object'?cfg.music:null;
-if(M){if((M.envato||{}).status==='preview')W('La música es la vista previa con marca de agua de Envato: falta licenciarla.');if((M.envato||{}).status==='pending')W('La música de Envato todavía no se descargó: licenciar y correr envato.py collect.');O(`Música: gancho ${M.hook_gain??.3} → fondo ${M.bed_gain??.08} bajo la voz → cierre ${M.outro_gain??.22}.`);}
+if(M){if((M.envato||{}).status==='preview')W('La música es la vista previa con marca de agua de Envato: falta licenciarla.');if((M.envato||{}).status==='pending')W('La música de Envato todavía no se descargó: licenciar y correr envato.py collect.');O(`Música: pareja en ${M.bed_gain??.08} todo el video, con fade-out final (sin subir en el gancho ni en el cierre).`);}
 else if(cfg.music)O('Música colocada a mano (X).');else W('Sin música de fondo.');
 for(const b of B){const m=(cfg.broll||{})[b.src]||{};if((m.envato||{}).status==='preview')W(`B-roll "${b.src}" es la vista previa con marca de agua: falta licenciarlo.`);if((m.envato||{}).status==='pending')W(`B-roll "${b.src}" de Envato todavía no se descargó: licenciar y correr envato.py collect.`);}
 // ── Cámara ──
@@ -100,8 +101,7 @@ html+=lane(146,26,fsj.map(j=>({a:j.start,b:j.end,l:j.id})),'#FF5A1F','Pantalla c
 html+=lane(182,12,caps.map(j=>({a:j.start,b:j.end})),'#666','Subtítulos');
 html+=lane(204,26,sfx.map(x=>({a:x.at,b:x.at+0.12,c:SC[x.cat]||'#fff',l:''})),'#fff','SFX');
 html+=sfx.map(x=>`<div style="position:absolute;left:${120+x.at*PX}px;top:232px;font-size:9px;color:${SC[x.cat]||'#fff'};transform:rotate(60deg);transform-origin:left top">${x.id}</div>`).join('');
-if(M){const tot=edl.total,hook=Math.min(Math.max(...edl.clips.filter(c=>c.seg===0).map(c=>c.tl_out)),3.5*FPS)/FPS,sp=T-(cfg.tail??1.2);
-  const pts=[[0,M.hook_gain??.3],[hook,M.hook_gain??.3],[hook+.6,M.bed_gain??.08],[sp,M.bed_gain??.08],[sp+.4,M.outro_gain??.22],[T-.8,M.outro_gain??.22],[T,0]];
+if(M){const bg=M.bed_gain??.08,pts=[[0,bg],[T-.8,bg],[T,0]];
   html+=`<svg style="position:absolute;left:120px;top:330px" width=1500 height=60><polyline fill=none stroke=#c6f stroke-width=2 points="${pts.map(([t,g])=>`${t*PX},${60-g/0.35*56}`).join(' ')}"/></svg><div class=lab style="top:350px">Música</div>`;}
 for(let s=0;s<=T;s+=5)html+=`<div style="position:absolute;left:${120+s*PX}px;top:400px;color:#777;font-size:10px">${s}s</div><div style="position:absolute;left:${120+s*PX}px;top:14px;height:380px;border-left:1px solid #222"></div>`;
 html+='</body></html>';fs.writeFileSync(path.join(WD,'timeline.html'),html);

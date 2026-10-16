@@ -38,4 +38,6 @@ c=chrome();row(bool(c),'Google Chrome',c or 'no encontrado','chrome')
 n=len(glob.glob(os.path.join(SK,'assets','sfx','*','*.wav')));row(n>0,'Efectos de sonido',f'{n} archivos' if n else 'faltan (edicion-sfx.zip)','sfx')
 for d in ('~/.claude/skills/edicion','~/.codex/skills/edicion'):
     p=os.path.expanduser(d);rows.append(f"{'✓' if os.path.exists(os.path.join(p,'SKILL.md')) else '·'} {'Skill en '+d:24s} {'instalada' if os.path.exists(os.path.join(p,'SKILL.md')) else 'no instalada (opcional)'}")
+BD=os.path.expanduser('~/.config/motion/brands');nb=sorted(x for x in os.listdir(BD) if os.path.exists(os.path.join(BD,x,'brand.json'))) if os.path.isdir(BD) else []
+rows.append(f"{'✓' if nb else '·'} {'Marcas (de motion)':24s} {', '.join(nb) if nb else 'ninguna además de editorial (se crean con la skill motion)'}")
 print('\n'.join(rows));print('\nTodo listo ✓' if not bad else f'\nFaltan {bad} cosa(s): correr los comandos indicados.');sys.exit(1 if bad else 0)

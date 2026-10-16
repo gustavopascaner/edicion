@@ -63,6 +63,7 @@ Resultado en la carpeta del video: `<NOMBRE>_EDIT/` con el XML, `Assets/{MG,Subt
 |---|---|
 | `scripts/` | Transcripción, corte, render de gráficos, armado del XML, importador de SFX |
 | `engine/` | Motor HTML de motion graphics (se renderiza con Chrome) y tipografías |
+| `scripts/brand.js` | Marcas compartidas con la skill [motion](https://github.com/gustavopascaner/motion) (`~/.config/motion/brands`): colores, tipografías y subtítulos |
 | `reference/` | Catálogo de escenas y un `jobs.js` de ejemplo |
 | `assets/sfx/` | Librería de efectos de sonido + `catalog.json` |
 | `scripts/envato.py` | Búsqueda en Envato, vistas previas, reemplazo por originales licenciados |

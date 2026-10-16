@@ -19,6 +19,7 @@ Correr Python siempre con `python3 -I` (**Windows**: `py -3 -I`). Pasar rutas co
 2. Inventario de la carpeta: `ffprobe` de cada video (duración, fps, rotación, `nb_frames`), tamaño de los PNG, duración de los audios. El crudo suele ser 1920×1080 con rotación 90 (= vertical 1080×1920, 30 fps).
 3. Mirar el material de apoyo: `ffmpeg -vf "fps=2,scale=150:-1,tile=10x2"` → mirar la imagen. Identificar qué ilustra cada clip/foto (gancho, chiste, metáfora). Si hay escenas, detectar cortes con `scdet`.
 4. Mirar un cuadro del crudo (color de ropa → colores de subtítulos, ver escenas.md).
+4b. **Marca** (preguntar SIEMPRE al empezar, salvo que el usuario ya la haya dicho): `node $SK/scripts/brand.js list` y preguntar cuál usar (en Claude Code con AskUserQuestion; opción por defecto *Editorial (la de siempre)*). Las marcas son las mismas de la skill **motion** (`~/.config/motion/brands`): cambian colores, tipografías y subtítulos de todos los motion graphics; **no se pone logo**. Poner `"brand": "<slug>"` en config.json (sin `brand` o `"editorial"` = el look de siempre). Para ver cómo se mapea: `node $SK/scripts/brand.js show <slug>`. Si el usuario quiere una marca nueva, se crea con motion (`reference/marca-nueva.md` de esa skill) y después se usa acá. Con una marca, `caption_colors` es opcional (por defecto usa el acento de la marca) y `var(--hot)` / `var(--lime)` / `var(--ink)` / `var(--paper)` en jobs.js ya toman los colores de la marca.
 5. **Dónde está la cara** (después de crear `config.json`, paso 3): `node $SK/scripts/face.js "<work>"` detecta la cara en 10 cuadros (Chrome FaceDetector) y guarda `config.face` {top, bottom, left, right}. Imprime la **decisión editorial de ubicación** y deja `<work>/face.png` (rojo = cara con el zoom máximo, verde = zonas libres, azul = subtítulos): **mirarla**. Si no detecta o se equivoca, estimarla mirando la imagen y poner `"face": {"top": …, "bottom": …, "left": …, "right": …, "manual": true}`.
 
 ## 1 · Transcribir
@@ -38,7 +39,7 @@ Whisper alucina sobre ruido ("Gracias", "Gracias por ver el video", "Suscríbete
 Crear `<work>/config.json` (abajo) y correr `python3 -I $SK/scripts/edl.py "<work>"` → imprime la duración y los tiempos por segmento y **re-transcribe el corte**: confirmar que no falte ni sobre ninguna palabra. Si falta un arranque, revisar con check.py y ajustar segs.json.
 
 ```json
-{ "name": "SIGN_SPINNER", "version": 1, "fps": 30, "tail": 1.2,
+{ "name": "SIGN_SPINNER", "version": 1, "fps": 30, "tail": 1.2, "brand": "editorial",
   "src": "/abs/crudo.mp4", "edit_dir": "/abs/carpeta/SIGN_SPINNER_EDIT",
   "caption_colors": {"act":"var(--hot)","kwAct":"var(--lime)","kw":"#FFB08A"},
   "keywords": ["pacientes","scroll","correctas"],

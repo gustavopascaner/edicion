@@ -10,6 +10,9 @@ const WD=path.resolve(process.argv[2]);
 const cfg=JSON.parse(fs.readFileSync(path.join(WD,'config.json')));
 const FPS=cfg.fps||30;
 const LAY=require('./layout.js')(cfg);
+// marca (compartida con motion: ~/.config/motion/brands). Sin marca o "editorial" = el look de siempre
+const BRAND=require('./brand.js'),BR=BRAND.loadBrand(cfg.brand);
+if(BR)console.log(`marca: ${BR.name||BR.slug}`);let FIT_SAID=0;
 const edl=JSON.parse(fs.readFileSync(path.join(WD,'edl.json')));
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
 // W(seg, palabra, n) → segundo de timeline donde empieza esa palabra dentro del segmento
@@ -158,9 +161,9 @@ async function main(){
   const browser=await puppeteer.launch({executablePath:CHROME,headless:true,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
-    await page.goto(fileURL(path.join(ENG,'engine.html')));await page.evaluate(()=>document.fonts.ready);
+    await page.goto(fileURL(path.join(ENG,'engine.html')));{const k=await BRAND.apply(page,BR);if(k&&k<.98&&!FIT_SAID){FIT_SAID=1;console.log(`marca: la tipografía de títulos es más ancha que la del motor → títulos al ${Math.round(k*100)} %`);}}await page.evaluate(()=>document.fonts.ready);
     await page.evaluate(L=>{window.SAFE=L.face?L:null;},LAY);
-    await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||null);
+    await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||(BR?BRAND.captionColors(BR):null));
     while(qi<list.length){const j=list[qi++];const dur=j.end-j.start;const nf=Math.round(dur*FPS);
       try{const pl=await page.evaluate((j,dur)=>{if(j.p.tiles)j.p.tiles.forEach(t=>t.fmt=FMT[t.fmt]);return setup(j.scene,j.p,dur);},j,dur);
         if(pl&&pl.mode!=='ok')console.log(`  cara: ${j.id} ${pl.mode}${pl.mode==='movido'?` (y ${pl.from}→${pl.to}, escala ${Math.round(pl.scale*100)} %)`:' — revisar a mano'}`);}catch(e){console.log('ERR',j.id,e.message.split('\n')[0]);continue;}

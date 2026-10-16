@@ -9,6 +9,8 @@ import json,os,re,shutil,sys,subprocess,time,urllib.parse
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;T0=time.time()
 from xml.sax.saxutils import escape
 W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
+_pend=[k for k,b in list((cfg.get('broll') or {}).items())+[('music',cfg.get('music'))] if isinstance(b,dict) and not b.get('path') and b.get('envato')]
+if _pend: sys.exit(f"⚠️  Envato sin descargar: {', '.join(_pend)} → licenciar/descargar y correr envato.py collect (o use --preview)")
 EDIT=cfg['edit_dir'];SRC=cfg['src'];FPS=cfg.get('fps',30);NAME=cfg['name'];VER=cfg.get('version',1)
 edl=json.load(open(os.path.join(W,'edl.json')));jobs=json.load(open(os.path.join(W,'jobs.json')));br=json.load(open(os.path.join(W,'broll.json')))
 RATE=f'<rate><timebase>{FPS}</timebase><ntsc>FALSE</ntsc></rate>'

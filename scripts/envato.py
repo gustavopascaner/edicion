@@ -2,14 +2,16 @@
 """B-roll y música de Envato Elements.
 El MCP público de Envato (https://mcp.envato.com/mcp) solo BUSCA: no descarga ni licencia. Este script lo llama por HTTP
 (no hace falta tenerlo configurado en el agente), baja las vistas previas con marca de agua para elegir y ubicar el
-material, y después reemplaza cada vista previa por el original licenciado cuando aparece en Descargas.
+material. Al elegir (use) NO se usa la vista previa: se licencia y descarga el original enseguida y collect lo registra.
 
 uso:
   envato.py search <work> video "<términos en inglés>" [--n 8] [--vertical] [--sub Medical] [--min 5] [--max 30]
   envato.py search <work> music "<términos>" [--n 6] [--mood inspiring] [--tempo "Medium (90-110 BPM)"] [--genre corporate]
         → <work>/envato/<kind>_<slug>.json + hoja de candidatos <work>/envato/<kind>_<slug>.jpg (videos) / perfil de energía (música)
-  envato.py use <work> <clave> <búsqueda>#<n>     (ej. kl video_doctor-talking#3) → registra en config.json (broll[clave] o music)
-  envato.py collect <work> [--from ~/Downloads] [--file <clave> <archivo>]  → reemplaza vistas previas por originales licenciados
+  envato.py use <work> <clave> <búsqueda>#<n> [--preview]  (ej. kl video_doctor-talking#3) → registra la elección en config.json
+        (broll[clave] o music) como PENDIENTE de descarga; --preview = usar la vista previa con marca de agua (solo si no se puede licenciar ya)
+  envato.py collect <work> [--from ~/Downloads] [--wait 300] [--file <clave> <archivo>]  → toma los originales licenciados de Descargas
+        (--wait = esperar hasta N s a que terminen de bajar)
   envato.py report <work>                          → tabla de procedencia (para el LEEME)
 """
 import os as _o,sys as _s,subprocess as _sp
@@ -106,22 +108,35 @@ def cfgio(W,c=None):
     p=os.path.join(W,'config.json')
     if c is None: return json.load(open(p))
     json.dump(c,open(p,'w'),indent=1,ensure_ascii=False)
-def use(W,key,ref):
+def use(W,key,ref,preview=False):
     name,n=ref.split('#');d=json.load(open(os.path.join(W,'envato',name+'.json')));it=next(x for x in d['items'] if x['n']==int(n))
-    if 'preview' not in it: raise SystemExit('ese candidato no tiene vista previa descargable; elegir otro')
-    c=cfgio(W);env=dict(url=it['item_url'],title=it['title'],author=it['author'],kind=d['kind'],search=d['terms'],status='preview',preview=it['preview'],chosen=time.time())
+    if preview and 'preview' not in it: raise SystemExit('ese candidato no tiene vista previa descargable; elegir otro')
+    c=cfgio(W);env=dict(url=it['item_url'],title=it['title'],author=it['author'],kind=d['kind'],search=d['terms'],status='preview' if preview else 'pending',preview=it.get('preview'),chosen=time.time())
     if d['kind']=='video':
-        c.setdefault('broll',{})[key]=dict(path=it['preview'],frames=it['frames'],rate=it['rate'],w=it['w'],h=it['h'],envato=env)
+        b=dict(envato=env,frames=it.get('frames'),rate=it.get('rate'),w=it.get('w'),h=it.get('h'))   # w/h/frames de la vista previa: se pisan con el original en collect
+        if preview: b['path']=it['preview']
+        c.setdefault('broll',{})[key]=b
     else:
         m=c.get('music') if isinstance(c.get('music'),dict) else {}
-        m.update(path=it['preview'],dur=round(it['dur'],2),envato=env);c['music']=m;c.pop('music_dur',None)
-    cfgio(W,c);print(f"✓ {key} = {it['title']} (vista previa con marca de agua hasta licenciar) · {it['item_url']}")
+        m.pop('path',None);m.update(dur=round(it.get('dur',0),2),envato=env)
+        if preview: m['path']=it['preview']
+        c['music']=m;c.pop('music_dur',None)
+    cfgio(W,c)
+    if preview: print(f"✓ {key} = {it['title']} (vista previa con marca de agua hasta licenciar) · {it['item_url']}")
+    else: print(f"✓ {key} = {it['title']} · LICENCIAR Y DESCARGAR AHORA → {it['item_url']}\n  después: envato.py collect \"{W}\" --wait 300")
 
 def entries(c):
     for k,b in (c.get('broll') or {}).items():
         if b.get('envato'): yield k,b
     if isinstance(c.get('music'),dict) and c['music'].get('envato'): yield 'music',c['music']
-def collect(W,src,manual=None):
+PART=('.crdownload','.download','.part','.tmp')
+def collect(W,src,manual=None,wait=0):
+    t_end=time.time()+wait
+    while True:
+        pend=_collect(W,src,manual)
+        if not pend or manual or time.time()>=t_end: break
+        time.sleep(5)
+def _collect(W,src,manual=None):
     c=cfgio(W);dst=os.path.join(c['edit_dir'],'Assets','Envato');os.makedirs(dst,exist_ok=True);tmp=os.path.join(W,'envato','_unzip')
     VID=('.mp4','.mov','.m4v');AUD=('.wav','.aif','.aiff','.mp3','.m4a')
     for k,b in entries(c):
@@ -131,10 +146,11 @@ def collect(W,src,manual=None):
         m=re.search(r'/([a-z0-9-]+)-([A-Z0-9]{6,})/?$',e['url']);base,iid=(norm(m.group(1)),m.group(2).lower()) if m else (norm(e['title']),'#')
         if manual: found=manual[1]
         else:
-            cands=[os.path.join(src,f) for f in os.listdir(src) if (base and base in norm(f)) or iid in f.lower()]
+            cands=[os.path.join(src,f) for f in os.listdir(src) if ((base and base in norm(f)) or iid in f.lower()) and not f.lower().endswith(PART)]
             cands=[p for p in cands if os.path.getmtime(p)>=e.get('chosen',0)-86400*30]
             if not cands: print(f'… {k}: todavía no está en {src} ({e["title"]})');continue
-            found=max(cands,key=os.path.getmtime)
+            found=max(cands,key=os.path.getmtime);sz=os.path.getsize(found);time.sleep(1)
+            if os.path.getsize(found)!=sz: print(f'… {k}: todavía bajando');continue
         if found.lower().endswith('.zip'):
             shutil.rmtree(tmp,ignore_errors=True);zipfile.ZipFile(found).extractall(tmp)
             media=[os.path.join(r,f) for r,_,fs in os.walk(tmp) for f in fs if '__MACOSX' not in r and f.lower().endswith(VID if e['kind']=='video' else AUD)]
@@ -148,13 +164,13 @@ def collect(W,src,manual=None):
         e.update(status='licensed',file=out);print(f'✓ {k}: original licenciado → {out}')
     shutil.rmtree(tmp,ignore_errors=True);cfgio(W,c)
     pend=[k for k,b in entries(c) if b['envato']['status']!='licensed']
-    print('pendientes:',', '.join(pend) if pend else 'ninguno — volver a correr build_xml.py')
+    print('pendientes:',', '.join(pend) if pend else 'ninguno ✓');return pend
 def report(W):
     c=cfgio(W);rows=list(entries(c))
     if not rows: print('Sin material de Envato.');return
     print('| Clave | Tipo | Título | Autor | Estado | Link |\n|---|---|---|---|---|---|')
     for k,b in rows:
-        e=b['envato'];print(f"| {k} | {'B-roll' if e['kind']=='video' else 'Música'} | {e['title']} | {e['author']} | {'✅ licenciado' if e['status']=='licensed' else '⚠️ vista previa con marca de agua: falta licenciar'} | {e['url']} |")
+        e=b['envato'];print(f"| {k} | {'B-roll' if e['kind']=='video' else 'Música'} | {e['title']} | {e['author']} | {'✅ licenciado' if e['status']=='licensed' else '⚠️ vista previa con marca de agua: falta licenciar' if e['status']=='preview' else '⏳ falta licenciar y descargar'} | {e['url']} |")
 
 if __name__=='__main__':
     a=sys.argv[1:];t0=time.time()
@@ -162,12 +178,12 @@ if __name__=='__main__':
     cmd,W=a[0],a[1];o={};pos=[];i=2
     while i<len(a):
         if a[i].startswith('--'):
-            if a[i] in('--vertical',): o[a[i][2:]]=True;i+=1
+            if a[i] in('--vertical','--preview'): o[a[i][2:]]=True;i+=1
             elif a[i]=='--file': o['file']=(a[i+1],a[i+2]);i+=3
             else: o[a[i][2:]]=a[i+1];i+=2
         else: pos.append(a[i]);i+=1
     if cmd=='search': search(W,pos[0],pos[1],o)
-    elif cmd=='use': use(W,pos[0],pos[1])
-    elif cmd=='collect': collect(W,os.path.expanduser(o.get('from','~/Downloads')),o.get('file'))
+    elif cmd=='use': use(W,pos[0],pos[1],o.get('preview',False))
+    elif cmd=='collect': collect(W,os.path.expanduser(o.get('from','~/Downloads')),o.get('file'),float(o.get('wait',0)))
     elif cmd=='report': report(W)
     if cmd in('search','collect'): timing.log(W,f'envato {cmd}',time.time()-t0)

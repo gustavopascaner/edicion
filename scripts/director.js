@@ -77,9 +77,9 @@ for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<0.25&&sfx[i].cat!=='build'
 const SMAX=cfg.sfx_max??5;(sfx.length>SMAX?W:O)(`SFX: ${sfx.length} en toda la edición (máximo ${SMAX})${sfx.length>SMAX?' — sacar los menos importantes':''}: ${sfx.map(x=>x.id+' '+f2(x.at)).join(' · ')}.`);
 for(let i=1;i<sfx.length;i++)if(sfx[i].at-sfx[i-1].at<3)W(`SFX muy cerca (${f2(sfx[i-1].at)} y ${f2(sfx[i].at)}): separarlos ≥ 3 s para que sea sutil.`);
 const M=cfg.music&&typeof cfg.music==='object'?cfg.music:null;
-if(M){if((M.envato||{}).status==='preview')W('La música es la vista previa con marca de agua de Envato: falta licenciarla.');O(`Música: gancho ${M.hook_gain??.3} → fondo ${M.bed_gain??.08} bajo la voz → cierre ${M.outro_gain??.22}.`);}
+if(M){if((M.envato||{}).status==='preview')W('La música es la vista previa con marca de agua de Envato: falta licenciarla.');if((M.envato||{}).status==='pending')W('La música de Envato todavía no se descargó: licenciar y correr envato.py collect.');O(`Música: gancho ${M.hook_gain??.3} → fondo ${M.bed_gain??.08} bajo la voz → cierre ${M.outro_gain??.22}.`);}
 else if(cfg.music)O('Música colocada a mano (X).');else W('Sin música de fondo.');
-for(const b of B){const m=(cfg.broll||{})[b.src]||{};if((m.envato||{}).status==='preview')W(`B-roll "${b.src}" es la vista previa con marca de agua: falta licenciarlo.`);}
+for(const b of B){const m=(cfg.broll||{})[b.src]||{};if((m.envato||{}).status==='preview')W(`B-roll "${b.src}" es la vista previa con marca de agua: falta licenciarlo.`);if((m.envato||{}).status==='pending')W(`B-roll "${b.src}" de Envato todavía no se descargó: licenciar y correr envato.py collect.`);}
 // ── Cámara ──
 const modes={};framing.forEach(f=>modes[f.mode]=(modes[f.mode]||0)+1);
 if(framing.length)O('Encuadres: '+Object.entries(modes).map(([k,v])=>`${k} ×${v}`).join(' · ')+'.');

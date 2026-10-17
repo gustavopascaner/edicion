@@ -77,11 +77,15 @@ else:
     cmd=['ffmpeg','-v','error','-y'];fc=[]
     for i,x in enumerate(P):
         cmd+=['-i',x['path']]
-        fc.append(f'[{i}:v:0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,format=yuv420p[v{i}]')
-        if x['acodec']: fc.append(f'[{i}:a:0]aresample=48000,aformat=channel_layouts=stereo,apad,atrim=0:{x["dur"]:.3f},asetpts=PTS-STARTPTS[a{i}]')
+        # video estirado hasta la duración de la parte (WhatsApp/celulares: el video suele ser más corto que el audio
+        # y sin esto cada parte siguiente arranca con el video adelantado → desincronizado en Premiere)
+        fc.append(f'[{i}:v:0]setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2,trim=duration={x["dur"]:.3f},setpts=PTS-STARTPTS,format=yuv420p[v{i}]')
+        # async=1:first_pts=0 rellena con silencio los huecos de marcas de tiempo (WhatsApp: el 1er paquete de audio
+        # "dura" ~0,2 s; sin esto el audio queda adelantado al video en Premiere/transcripción)
+        if x['acodec']: fc.append(f'[{i}:a:0]aresample=48000:async=1:first_pts=0,aformat=channel_layouts=stereo,apad,atrim=0:{x["dur"]:.3f},asetpts=N/SR/TB[a{i}]')
         else: fc.append(f'anullsrc=r=48000:cl=stereo,atrim=0:{x["dur"]:.3f}[a{i}]')
     fc.append(''.join(f'[v{i}][a{i}]' for i in range(len(P)))+f'concat=n={len(P)}:v=1:a=1[v][a]')
-    cmd+=['-filter_complex',';'.join(fc),'-map','[v]','-map','[a]','-c:v','libx264','-preset','medium','-crf','16','-c:a','aac','-b:a','256k','-ar','48000','-movflags','+faststart',out]
+    cmd+=['-filter_complex',';'.join(fc),'-map','[v]','-map','[a]','-fps_mode','cfr','-r','30','-c:v','libx264','-preset','medium','-crf','16','-c:a','aac','-b:a','256k','-ar','48000','-movflags','+faststart',out]
     print('… recodificando (tarda unos minutos)',flush=True)
 r=subprocess.run(cmd)
 if same: os.unlink(lst.name)

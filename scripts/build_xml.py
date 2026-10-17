@@ -45,21 +45,41 @@ def clip(cid,name,fx,start,end,cin,cout,dur,extra='',srctrack=None):
             f'<start>{start}</start><end>{end}</end><in>{cin}</in><out>{cout}</out>{fx}{st}{extra}</clipitem>')
 def track(items): return '<track>'+''.join(items)+'<enabled>TRUE</enabled><locked>FALSE</locked></track>'
 FRAMING={f['i']:f for f in json.load(open(os.path.join(W,'framing.json')))} if os.path.exists(os.path.join(W,'framing.json')) else {}
+# Crudo en partes (join.py): por defecto V1/A1 usan el crudo unido (join.py corrige los huecos de audio de WhatsApp).
+# config.use_parts=true → V1/A1 apuntan a cada FRAGMENTO original (solo si los fragmentos no tienen huecos de audio).
+PARTS=[]
+if os.path.exists(os.path.join(W,'parts.json')) and cfg.get('use_parts'):
+    for p in json.load(open(os.path.join(W,'parts.json')))['parts']:
+        o=json.loads(subprocess.run(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=width,height:stream_side_data=rotation:stream_tags=rotate','-of','json',p['path']],capture_output=True,text=True).stdout)['streams'][0]
+        rot=abs(int(float((o.get('side_data_list') or [{}])[0].get('rotation',0) or (o.get('tags') or {}).get('rotate',0))))%180
+        w,h=(o['height'],o['width']) if rot==90 else (o['width'],o['height'])
+        PARTS.append(dict(path=p['path'],f0=fr(p['start']),frames=probe_frames(p['path']),w=w,h=h,k=max(1080/w,1920/h)))
+def part_of(c):
+    for j,p in enumerate(PARTS):
+        if p['f0']<=c['src_in']<p['f0']+p['frames']+1: return j,p
+    return None,None
 v1=[];a1=[]
 for c in edl['clips']:
     i=c['i'];vid=f'v1-{i}';aid=f'a1-{i}'
+    j,P=part_of(c) if PARTS else (None,None)
+    if P:  # in/out locales del fragmento + escala para llenar 1080×1920
+        k=P['k'];c=dict(c,src_in=c['src_in']-P['f0'],src_out=min(c['src_out']-P['f0'],P['frames']))
+        fel=lambda: file_el(f'file-part{j+1}',P['path'],P['frames'],True,True,P['w'],P['h']);FR_=P['frames']
+    else:
+        k=1;fel=lambda: file_el('file-src',SRC,SRC_FRAMES,True,True);FR_=SRC_FRAMES
+    S_=lambda s:round(s*k,1)
     f=FRAMING.get(i)
-    if not f: mot=motion(100,[(c['src_in'],100),(c['src_out'],106)]) if i%2==0 else motion(118)
-    elif f['s0']==f['s1']: mot=motion(f['s0'])
-    elif f.get('ramp'): r=min(c['src_out']-1,c['src_in']+fr(f['ramp']));mot=motion(f['s0'],[(c['src_in'],f['s0']),(r,f['s1']),(c['src_out'],f['s1']+1)])
-    else: mot=motion(f['s0'],[(c['src_in'],f['s0']),(c['src_out'],f['s1'])])
+    if not f: mot=motion(S_(100),[(c['src_in'],S_(100)),(c['src_out'],S_(106))]) if i%2==0 else motion(S_(118))
+    elif f['s0']==f['s1']: mot=motion(S_(f['s0']))
+    elif f.get('ramp'): r=min(c['src_out']-1,c['src_in']+fr(f['ramp']));mot=motion(S_(f['s0']),[(c['src_in'],S_(f['s0'])),(r,S_(f['s1'])),(c['src_out'],S_(f['s1']+1))])
+    else: mot=motion(S_(f['s0']),[(c['src_in'],S_(f['s0'])),(c['src_out'],S_(f['s1']))])
     link=(f'<link><linkclipref>{vid}</linkclipref><mediatype>video</mediatype><trackindex>1</trackindex><clipindex>{i+1}</clipindex></link>'
           f'<link><linkclipref>{aid}</linkclipref><mediatype>audio</mediatype><trackindex>1</trackindex><clipindex>{i+1}</clipindex><groupindex>1</groupindex></link>')
     nm=f'{i:02d} · '+c['text'][:40]
-    v1.append(clip(vid,nm,file_el('file-src',SRC,SRC_FRAMES,True,True),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],SRC_FRAMES,mot+link))
+    v1.append(clip(vid,nm,fel(),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],FR_,mot+link))
     # config.voice_gain_db: ganancia de la voz del crudo (crudos grabados muy bajos)
     vg=(level(round(10**(cfg['voice_gain_db']/20),4)) if cfg.get('voice_gain_db') else '')
-    a1.append(clip(aid,nm,file_el('file-src',SRC,SRC_FRAMES,True,True),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],SRC_FRAMES,link+vg,srctrack=1))
+    a1.append(clip(aid,nm,fel(),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],FR_,link+vg,srctrack=1))
 v2=[]
 for b in br['broll']:
     m=cfg['broll'][b['src']];p=m['path'];s=fr(b['start']);n=fr(b['dur'])

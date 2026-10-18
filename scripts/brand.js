@@ -70,7 +70,7 @@ async function apply(page,b){if(!b)return null;
   return k;}
 
 // Detecta la marca de una carpeta de videos. Orden: 1) archivo .marca (en la carpeta o hasta 3 niveles arriba),
-// 2) "brand" del config.json de ediciones anteriores (<x>_EDIT/.work en la carpeta y sus vecinas; gana la más reciente),
+// 2) "brand" del config.json de videos anteriores (<x>_EDIT o <x>_MOTION de la skill motion; gana el más reciente),
 // 3) nombre de la carpeta o de sus padres = slug o nombre de una marca (sin tildes ni mayúsculas).
 const norm=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 function detect(dir){dir=path.resolve(dir);if(fs.existsSync(dir)&&!fs.statSync(dir).isDirectory())dir=path.dirname(dir);
@@ -79,10 +79,10 @@ function detect(dir){dir=path.resolve(dir);if(fs.existsSync(dir)&&!fs.statSync(d
   for(const d of ups){const f=path.join(d,'.marca');if(fs.existsSync(f)){const s=fs.readFileSync(f,'utf8').trim();
     if(valid.has(s))return {slug:s,why:`archivo ${f}`};}}
   const cfgs=[];for(const d of ups.slice(0,2)){let ents=[];try{ents=fs.readdirSync(d);}catch(e){}
-    for(const e of ents)if(/_EDIT$/.test(e)){const f=path.join(d,e,'.work','config.json');
+    for(const e of ents)if(/_(EDIT|MOTION)$/.test(e)){const f=path.join(d,e,'.work','config.json');
       try{const c=JSON.parse(fs.readFileSync(f,'utf8'));if(c.brand&&valid.has(c.brand))cfgs.push({slug:c.brand,f,t:fs.statSync(f).mtimeMs});}catch(x){}}
     if(cfgs.length)break;}
-  if(cfgs.length){cfgs.sort((a,b)=>b.t-a.t);return {slug:cfgs[0].slug,why:`edición anterior ${cfgs[0].f}`};}
+  if(cfgs.length){cfgs.sort((a,b)=>b.t-a.t);return {slug:cfgs[0].slug,why:`video anterior ${cfgs[0].f}`};}
   const names=list().map(x=>({slug:x.slug,keys:[norm(x.slug),norm(x.name)]}));
   for(const d of ups){const seg=norm(path.basename(d));if(!seg)continue;
     const exact=names.find(n=>n.keys.includes(seg));if(exact)return {slug:exact.slug,why:`nombre de carpeta "${path.basename(d)}"`};

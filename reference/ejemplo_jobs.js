@@ -1,7 +1,13 @@
+// ⚠️ NO ES UNA PLANTILLA: es solo referencia de SINTAXIS (J/B/F/S/W…). No copiar su secuencia de escenas ni su look:
+//    cada video arma la suya desde el guion y desde <work>/arte.json (SKILL.md 4-pre). Ver skins y tratamientos en escenas.md.
+// Ejemplos de lo nuevo (comentados, no forman parte del ejemplo base):
+//   J('05_pasos','listCard','ov',s,e,{kick:'PASO A PASO',skin:'notebook',motion:'type',items:[…]});
+//   J('09_remate','fsTitle','fs',s,e,{kick:'OJO',skin:'stack',lines:['NO ES','NORMAL'],bg:'var(--hot)'});
+//   B('ev_consulta',2,t0,2.4,null,{fx:'polaroid',label:'en consulta'});   B('kl',0,k0,3,[100,112],{fx:'push'});
 // Ejemplo real (video "sign spinner"). Cada bloque = un segmento de segs.json.
 // ctx: J(id,escena,pista,inicio,fin,params[,sfx]) — sin sfx = diseño sonoro automático; 'pop' | 'bass-drop' | ['pop',['ding',1.2]] | null = manual (SKILL.md 4b)
 //      F(seg,'punch'|'wide'|'tight'|'push'|'snap'|'pull') fuerza el encuadre (SKILL.md 4c)
-//      S(sfx,segundo,{gain,dur}) sonido suelto de la librería · B(clave_broll,seg_origen,inicio,dur,[kb0,kb1]) · X(audio_abs,inicio,dur,gain,seg_origen)
+//      S(sfx,segundo,{gain,dur}) sonido suelto de la librería · B(clave_broll,seg_origen,inicio,dur,[kb0,kb1],{fx,label,bg}) · X(audio_abs,inicio,dur,gain,seg_origen)
 //      W(seg,'palabra',n) · C(seg) inicio · CE(seg) fin · R(s,t) relativo · H(txt) resaltado
 module.exports=({J,B,X,S,F,W,C,CE,R,H,cfg,edl,FPS})=>{
 // La música (config.music) y su volumen (parejo todo el video, fade-out final) los arma build_xml.py: no hace falta X().

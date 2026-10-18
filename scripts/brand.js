@@ -2,6 +2,8 @@
 // Acá no se crean ni se editan: solo se leen para cambiar colores, tipografías y subtítulos. Sin marca (o "editorial") = el look de siempre.
 // uso: node brand.js list          → marcas disponibles
 //      node brand.js show <marca>  → cómo se mapea a este motor
+//      node brand.js detect <carpeta> → adivina la marca de la carpeta de videos (archivo .marca, ediciones anteriores, nombre de carpeta)
+//      node brand.js remember <carpeta> <marca> → guarda .marca en la carpeta para la próxima
 const fs=require('fs'),path=require('path'),os=require('os');
 const {fileURL}=require('./platform.js');
 const H=os.homedir();
@@ -45,6 +47,11 @@ function css(b){const P=palette(b),f=b.fonts||{},out=[];
   return out.join('\n');}
 
 // subtítulos: la palabra activa en el acento que mejor se lee con texto oscuro encima
+// estilo de subtítulos propio de la marca (opcional): brand.json "captions": {style:'box'|'underline'|'pop'|'karaoke'|'minimal'|'stacked', size?, case:'upper'|'none', font:'display'|'body'|'serif', dy?}
+// OJO: la skill motion ya usa "captions" ({on, upper, size}) para lo suyo: acá solo cuenta si trae "style" (si no, el look de siempre)
+// config.caption_style y arte.json "subtitulos" lo pisan
+function captionStyle(b){const c=b&&b.captions;if(typeof c==='string')return {style:c};if(!c||!c.style)return null;
+  const {on,upper,...r}=c;return {...r,case:r.case||(upper===false?'none':undefined)};}
 function captionColors(b){const c=b.colors,best=[c.accent,c.accent2].filter(Boolean).sort((x,y)=>con(y,c.dark)-con(x,c.dark))[0];return {act:best,kwAct:'#fff',kw:best};}
 
 // en la página del motor: saca las @font-face originales (si no, se mezclan con las de la marca) y aplica la marca
@@ -62,14 +69,38 @@ async function apply(page,b){if(!b)return null;
     els.forEach((e,i)=>e.style.fontSize=(fs[i]*k).toFixed(2)+'px');return r;};},k);
   return k;}
 
-module.exports={loadBrand,list,css,palette,captionColors,apply};
+// Detecta la marca de una carpeta de videos. Orden: 1) archivo .marca (en la carpeta o hasta 3 niveles arriba),
+// 2) "brand" del config.json de ediciones anteriores (<x>_EDIT/.work en la carpeta y sus vecinas; gana la más reciente),
+// 3) nombre de la carpeta o de sus padres = slug o nombre de una marca (sin tildes ni mayúsculas).
+const norm=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+function detect(dir){dir=path.resolve(dir);if(fs.existsSync(dir)&&!fs.statSync(dir).isDirectory())dir=path.dirname(dir);
+  const valid=new Set(['editorial',...list().map(x=>x.slug)]);const ups=[];
+  for(let d=dir,i=0;i<4&&d!==H&&d!==path.dirname(d);i++,d=path.dirname(d))ups.push(d);
+  for(const d of ups){const f=path.join(d,'.marca');if(fs.existsSync(f)){const s=fs.readFileSync(f,'utf8').trim();
+    if(valid.has(s))return {slug:s,why:`archivo ${f}`};}}
+  const cfgs=[];for(const d of ups.slice(0,2)){let ents=[];try{ents=fs.readdirSync(d);}catch(e){}
+    for(const e of ents)if(/_EDIT$/.test(e)){const f=path.join(d,e,'.work','config.json');
+      try{const c=JSON.parse(fs.readFileSync(f,'utf8'));if(c.brand&&valid.has(c.brand))cfgs.push({slug:c.brand,f,t:fs.statSync(f).mtimeMs});}catch(x){}}
+    if(cfgs.length)break;}
+  if(cfgs.length){cfgs.sort((a,b)=>b.t-a.t);return {slug:cfgs[0].slug,why:`edición anterior ${cfgs[0].f}`};}
+  const names=list().map(x=>({slug:x.slug,keys:[norm(x.slug),norm(x.name)]}));
+  for(const d of ups){const seg=norm(path.basename(d));if(!seg)continue;
+    const exact=names.find(n=>n.keys.includes(seg));if(exact)return {slug:exact.slug,why:`nombre de carpeta "${path.basename(d)}"`};
+    const part=names.filter(n=>!/-v\d+$/.test(n.slug)&&n.keys.some(k=>k.length>=4&&(`-${seg}-`).includes(`-${k}-`)));
+    if(part.length===1)return {slug:part[0].slug,why:`nombre de carpeta "${path.basename(d)}"`};}
+  return null;}
 
-if(require.main===module){const [cmd,slug]=process.argv.slice(2);
+module.exports={loadBrand,list,css,palette,captionColors,captionStyle,apply,detect};
+
+if(require.main===module){const [cmd,slug,arg3]=process.argv.slice(2);
   try{if(cmd==='list'){console.log('editorial            Editorial (la de siempre)      #0E0D0C #F3EEE5 #FF5A1F #D4FF3A · Bricolage Grotesque');
       for(const x of list().filter(x=>x.slug!=='editorial'))console.log(`${x.slug.padEnd(20)} ${String(x.name).slice(0,30).padEnd(30)} ${x.colors.dark} ${x.colors.light} ${x.colors.accent} ${x.colors.accent2||''} · ${x.font||'-'}`);}
     else if(cmd==='show'){const b=loadBrand(slug);if(!b){console.log('editorial: el look de siempre del motor');process.exit(0);}
       const P=palette(b),f=b.fonts||{};console.log(`${b.name||slug}\n  colores: ink ${P.ink} · paper ${P.paper} · hot ${P.hot} · lime ${P.lime}`);
       console.log(`  tipografías: títulos ${(f.display||{}).family} · texto ${(f.body||{}).family} · etiquetas ${(f.mono||{}).family} · acento ${(f.accent||{}).family}`);
-      console.log(`  subtítulos: activa ${captionColors(b).act}`);}
-    else console.log('uso: node brand.js list | show <marca>');}
+      console.log(`  subtítulos: activa ${captionColors(b).act} · estilo ${(captionStyle(b)||{style:'box'}).style}${captionStyle(b)?'':' (default; se cambia con "captions":{"style":…} en brand.json o config.caption_style)'}`);}
+    else if(cmd==='detect'){const r=detect(slug||'.');if(!r){console.log('(sin marca detectada)');process.exit(2);}console.log(`${r.slug}\t${r.why}`);}
+    else if(cmd==='remember'){if(arg3!=='editorial')loadBrand(arg3);const d=fs.statSync(slug).isDirectory()?slug:path.dirname(slug);
+      fs.writeFileSync(path.join(d,'.marca'),arg3+'\n');console.log(`✓ ${path.join(d,'.marca')} → ${arg3}`);}
+    else console.log('uso: node brand.js list | show <marca> | detect <carpeta> | remember <carpeta> <marca>');}
   catch(e){console.error('✗',e.message);process.exit(1);}}

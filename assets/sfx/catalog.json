@@ -4,77 +4,107 @@
   "whoosh": {
    "gain": 0.22,
    "auto": true,
-   "desc": "Transiciones: entrada de pantallas completas, wipes, cambios de tarjeta. Se alternan."
+   "desc": "Transiciones: entrada de pantallas completas, wipes, cambios de tarjeta. Se alternan.",
+   "rel_db": 12,
+   "tail": 0.9
   },
   "build": {
    "gain": 0.25,
    "auto": true,
-   "desc": "Crece hasta el evento (reverse-whoosh antes de un corte; riser antes de un gran remate)."
+   "desc": "Crece hasta el evento (reverse-whoosh antes de un corte; riser antes de un gran remate).",
+   "rel_db": 13,
+   "tail": 0.6
   },
   "zoom": {
    "gain": 0.2,
    "auto": true,
-   "desc": "Punch-in, lupa, acercar la atención."
+   "desc": "Punch-in, lupa, acercar la atención.",
+   "rel_db": 12,
+   "tail": 1.0
   },
   "wind": {
    "gain": 0.2,
    "auto": true,
-   "desc": "Aparición especial/mágica, revelación suave."
+   "desc": "Aparición especial/mágica, revelación suave.",
+   "rel_db": 13,
+   "tail": 2.2
   },
   "pop": {
    "gain": 0.25,
    "auto": true,
-   "desc": "Aparición de tarjetas, stickers, ítems de lista."
+   "desc": "Aparición de tarjetas, stickers, ítems de lista.",
+   "rel_db": 11,
+   "tail": 0.7
   },
   "click": {
    "gain": 0.25,
    "auto": true,
-   "desc": "Interfaces: botones, búsquedas, DMs, seguir, tildar."
+   "desc": "Interfaces: botones, búsquedas, DMs, seguir, tildar.",
+   "rel_db": 11,
+   "tail": 0.5
   },
   "bounce": {
    "gain": 0.22,
    "auto": true,
-   "desc": "Elementos que rebotan, tono de humor."
+   "desc": "Elementos que rebotan, tono de humor.",
+   "rel_db": 12,
+   "tail": 1.0
   },
   "hit": {
    "gain": 0.3,
    "auto": true,
-   "desc": "Remates fuertes, sellos, pantallas completas de impacto. bass-drop solo para el remate más fuerte."
+   "desc": "Remates fuertes, sellos, pantallas completas de impacto. bass-drop solo para el remate más fuerte.",
+   "rel_db": 10,
+   "tail": 1.6
   },
   "ding": {
    "gain": 0.2,
    "auto": true,
-   "desc": "Check ✓, acierto, idea, dato positivo."
+   "desc": "Check ✓, acierto, idea, dato positivo.",
+   "rel_db": 11,
+   "tail": 1.7
   },
   "error": {
    "gain": 0.2,
    "auto": true,
-   "desc": "Tachar, ✗, lo que está mal, mito."
+   "desc": "Tachar, ✗, lo que está mal, mito.",
+   "rel_db": 12,
+   "tail": 0.8
   },
   "glitch": {
    "gain": 0.2,
    "auto": true,
-   "desc": "Algo que falla, se rompe o desaparece; tono tech."
+   "desc": "Algo que falla, se rompe o desaparece; tono tech.",
+   "rel_db": 12,
+   "tail": 1.0
   },
   "poof": {
    "gain": 0.22,
    "auto": true,
-   "desc": "Algo que desaparece en el aire."
+   "desc": "Algo que desaparece en el aire.",
+   "rel_db": 12,
+   "tail": 0.8
   },
   "foley": {
    "gain": 0.25,
    "auto": false,
-   "desc": "Literales: solo cuando lo que se dice/ve coincide (escribir, cierre, estirar, inodoro)."
+   "desc": "Literales: solo cuando lo que se dice/ve coincide (escribir, cierre, estirar, inodoro).",
+   "rel_db": 11,
+   "tail": 99
   },
   "splash": {
    "gain": 0.22,
    "auto": false,
-   "desc": "Literales: agua, salpicar, caer en algo."
+   "desc": "Literales: agua, salpicar, caer en algo.",
+   "rel_db": 12,
+   "tail": 99
   },
   "car": {
    "gain": 0.2,
    "auto": false,
-   "desc": "Literales: autos, arrancar, pasar de largo."
+   "desc": "Literales: autos, arrancar, pasar de largo.",
+   "rel_db": 12,
+   "tail": 99
   }
  },
  "sounds": {
@@ -100,6 +130,17 @@
    "desc": "Rebote de dibujo animado",
    "source": "cartoon-bounce-02.wav"
   },
+  "bounce-boing": {
+   "cat": "bounce",
+   "file": "bounce/bounce-boing.wav",
+   "dur": 0.75,
+   "anchor": 0.018,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.7,
+   "desc": "Boing de resorte, tono de humor.",
+   "source": "sintetizado (sfx_synth.py)"
+  },
   "reverse-whoosh": {
    "cat": "build",
    "file": "build/reverse-whoosh.wav",
@@ -121,7 +162,30 @@
    "tp": -5.2,
    "desc": "Riser cinematográfico de ~6 s que explota en el evento. No entra en la rotación de \"build\": pedirlo por id.",
    "source": "Cinematic Riser.wav",
-   "rotate": false
+   "rotate": false,
+   "tail": 0.4
+  },
+  "riser-short-1": {
+   "cat": "build",
+   "file": "build/riser-short-1.wav",
+   "dur": 1.794,
+   "anchor": 1.681,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.6,
+   "desc": "Riser suave de 2 s; el pico es el final (evento).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "riser-short-2": {
+   "cat": "build",
+   "file": "build/riser-short-2.wav",
+   "dur": 2.656,
+   "anchor": 2.575,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -6.4,
+   "desc": "Riser suave de 3 s; el pico es el final (evento).",
+   "source": "sintetizado (sfx_synth.py)"
   },
   "car-ignition": {
    "cat": "car",
@@ -222,6 +286,39 @@
    "desc": "Click digital, interfaz/app",
    "source": "Click Digital Bot.wav"
   },
+  "click-tick-1": {
+   "cat": "click",
+   "file": "click/click-tick-1.wav",
+   "dur": 0.132,
+   "anchor": 0.006,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Tick de interfaz, seco y corto (banda 3000 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "click-tick-2": {
+   "cat": "click",
+   "file": "click/click-tick-2.wav",
+   "dur": 0.131,
+   "anchor": 0.007,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Tick de interfaz, seco y corto (banda 2200 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "click-tick-3": {
+   "cat": "click",
+   "file": "click/click-tick-3.wav",
+   "dur": 0.13,
+   "anchor": 0.006,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Tick de interfaz, seco y corto (banda 3800 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
   "ding-1": {
    "cat": "ding",
    "file": "ding/ding-1.wav",
@@ -232,6 +329,61 @@
    "tp": -3.7,
    "desc": "Ding: acierto, check, idea",
    "source": "ding.wav"
+  },
+  "ding-bell-1": {
+   "cat": "ding",
+   "file": "ding/ding-bell-1.wav",
+   "dur": 1.9,
+   "anchor": 0.011,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -9.2,
+   "desc": "Campanita suave (784 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "ding-bell-2": {
+   "cat": "ding",
+   "file": "ding/ding-bell-2.wav",
+   "dur": 1.9,
+   "anchor": 0.01,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -9.4,
+   "desc": "Campanita suave (932 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "ding-bell-3": {
+   "cat": "ding",
+   "file": "ding/ding-bell-3.wav",
+   "dur": 1.9,
+   "anchor": 0.009,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -9.7,
+   "desc": "Campanita suave (1047 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "error-buzz-soft": {
+   "cat": "error",
+   "file": "error/error-buzz-soft.wav",
+   "dur": 0.75,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -11.4,
+   "desc": "Dos tonos graves descendentes, suave (✗).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "error-thud-soft": {
+   "cat": "error",
+   "file": "error/error-thud-soft.wav",
+   "dur": 0.5,
+   "anchor": 0.0,
+   "anchor_mode": "onset",
+   "lufs": -16.0,
+   "tp": -5.6,
+   "desc": "Golpecito grave y opaco de \"no va\" (✗).",
+   "source": "sintetizado (sfx_synth.py)"
   },
   "game-over": {
    "cat": "error",
@@ -323,6 +475,17 @@
    "source": "Computer_glitch.wav",
    "rotate": false
   },
+  "glitch-digital-2": {
+   "cat": "glitch",
+   "file": "glitch/glitch-digital-2.wav",
+   "dur": 0.6,
+   "anchor": 0.014,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -4.1,
+   "desc": "Tartamudeo digital corto (pasos de tono y ruido en ráfagas).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
   "glitch-out": {
    "cat": "glitch",
    "file": "glitch/glitch-out.wav",
@@ -344,18 +507,41 @@
    "tp": -7.9,
    "desc": "Golpe cinematográfico con caída de graves (remate muy fuerte). No entra en la rotación de \"hit\": pedirlo por id.",
    "source": "OhmLab_Cinematic-Hit-Dramatic-Bass-Drop.wav",
-   "rotate": false
+   "rotate": false,
+   "tail": 2.8
   },
-  "hit-1": {
+  "hit-sub-1": {
    "cat": "hit",
-   "file": "hit/hit-1.wav",
-   "dur": 4.0,
-   "anchor": 0.024,
+   "file": "hit/hit-sub-1.wav",
+   "dur": 1.6,
+   "anchor": 0.017,
    "anchor_mode": "peak",
    "lufs": -16.0,
-   "tp": -1.9,
-   "desc": "Golpe con cola, remate",
-   "source": "Mountain Audio - Hit.wav"
+   "tp": -3.6,
+   "desc": "Golpe grave con cuerpo (48 Hz de fondo).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "hit-sub-2": {
+   "cat": "hit",
+   "file": "hit/hit-sub-2.wav",
+   "dur": 1.6,
+   "anchor": 0.019,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -3.4,
+   "desc": "Golpe grave con cuerpo (42 Hz de fondo).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "hit-sub-3": {
+   "cat": "hit",
+   "file": "hit/hit-sub-3.wav",
+   "dur": 1.458,
+   "anchor": 0.015,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -3.4,
+   "desc": "Golpe grave con cuerpo (58 Hz de fondo).",
+   "source": "sintetizado (sfx_synth.py)"
   },
   "poof-1": {
    "cat": "poof",
@@ -367,17 +553,6 @@
    "tp": -1.0,
    "desc": "Desaparecer en el aire (puf)",
    "source": "Disappear-into-Thin-Air_TTX026004.wav"
-  },
-  "drop-1": {
-   "cat": "pop",
-   "file": "pop/drop-1.wav",
-   "dur": 0.638,
-   "anchor": 0.0,
-   "anchor_mode": "onset",
-   "lufs": -16.0,
-   "tp": -1.4,
-   "desc": "Gota, pop líquido",
-   "source": "Pouring Wet Drops 1.wav"
   },
   "drop-2": {
    "cat": "pop",
@@ -398,8 +573,9 @@
    "anchor_mode": "peak",
    "lufs": -17.6,
    "tp": -1.0,
-   "desc": "Plop de agua chico",
-   "source": "SplashesSmallPlopL TE049201.wav"
+   "desc": "Plop de agua chico. Es de agua (literal): no entra en la rotación de \"pop\", pedirlo por id.",
+   "source": "SplashesSmallPlopL TE049201.wav",
+   "rotate": false
   },
   "pop-1": {
    "cat": "pop",
@@ -411,6 +587,39 @@
    "tp": -1.0,
    "desc": "Pop seco y corto",
    "source": "pop-01.wav"
+  },
+  "pop-soft-1": {
+   "cat": "pop",
+   "file": "pop/pop-soft-1.wav",
+   "dur": 0.35,
+   "anchor": 0.011,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Pop suave de burbuja (640→270 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "pop-soft-2": {
+   "cat": "pop",
+   "file": "pop/pop-soft-2.wav",
+   "dur": 0.301,
+   "anchor": 0.011,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Pop suave de burbuja (840→340 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "pop-soft-3": {
+   "cat": "pop",
+   "file": "pop/pop-soft-3.wav",
+   "dur": 0.35,
+   "anchor": 0.011,
+   "anchor_mode": "peak",
+   "lufs": -70.0,
+   "tp": -1.0,
+   "desc": "Pop suave de burbuja (500→210 Hz).",
+   "source": "sintetizado (sfx_synth.py)"
   },
   "splash-1": {
    "cat": "splash",
@@ -467,6 +676,39 @@
    "desc": "Barrido tipo capa, rápido",
    "source": "Sweep Cloak.wav"
   },
+  "whoosh-air-1": {
+   "cat": "whoosh",
+   "file": "whoosh/whoosh-air-1.wav",
+   "dur": 0.767,
+   "anchor": 0.285,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -7.8,
+   "desc": "Aire que sube y pasa (pico a los 0,35 s).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "whoosh-air-2": {
+   "cat": "whoosh",
+   "file": "whoosh/whoosh-air-2.wav",
+   "dur": 0.735,
+   "anchor": 0.189,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -6.7,
+   "desc": "Aire que baja y se va (pico a los 0,2 s).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "whoosh-soft-3": {
+   "cat": "whoosh",
+   "file": "whoosh/whoosh-soft-3.wav",
+   "dur": 0.44,
+   "anchor": 0.195,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -5.2,
+   "desc": "Whoosh corto y suave, de paso rápido.",
+   "source": "sintetizado (sfx_synth.py)"
+  },
   "woosh-1": {
    "cat": "whoosh",
    "file": "whoosh/woosh-1.wav",
@@ -512,6 +754,39 @@
    "source": "Whoosh 6120_73_1.wav",
    "rotate": false
   },
+  "wind-shimmer-1": {
+   "cat": "wind",
+   "file": "wind/wind-shimmer-1.wav",
+   "dur": 2.436,
+   "anchor": 1.002,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -7.9,
+   "desc": "Brillo suave de aparición (aire y armónicos).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "wind-shimmer-2": {
+   "cat": "wind",
+   "file": "wind/wind-shimmer-2.wav",
+   "dur": 2.347,
+   "anchor": 0.815,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -8.5,
+   "desc": "Brillo suave de aparición (aire y armónicos).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "wind-shimmer-3": {
+   "cat": "wind",
+   "file": "wind/wind-shimmer-3.wav",
+   "dur": 2.527,
+   "anchor": 0.985,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -9.0,
+   "desc": "Brillo suave de aparición (aire y armónicos).",
+   "source": "sintetizado (sfx_synth.py)"
+  },
   "zoom-1": {
    "cat": "zoom",
    "file": "zoom/zoom-1.wav",
@@ -522,6 +797,38 @@
    "tp": -2.4,
    "desc": "Zoom / acercamiento rápido (punch-in, lupa)",
    "source": "Zoom.wav"
+  },
+  "zoom-sweep-1": {
+   "cat": "zoom",
+   "file": "zoom/zoom-sweep-1.wav",
+   "dur": 0.766,
+   "anchor": 0.469,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -7.3,
+   "desc": "Barrido ascendente 220→880 Hz que cierra en el acercamiento.",
+   "source": "sintetizado (sfx_synth.py)"
+  },
+  "zoom-sweep-2": {
+   "cat": "zoom",
+   "file": "zoom/zoom-sweep-2.wav",
+   "dur": 0.715,
+   "anchor": 0.38,
+   "anchor_mode": "peak",
+   "lufs": -16.0,
+   "tp": -7.6,
+   "desc": "Barrido ascendente 300→1100 Hz que cierra en el acercamiento.",
+   "source": "sintetizado (sfx_synth.py)"
   }
+ },
+ "levels": {
+  "voice_lufs": -16.0,
+  "voice_crest_db": 12.0,
+  "lufs_rel": {
+   "short": 12,
+   "mid": 14,
+   "long": 16
+  },
+  "desc": "Nivel automático (dB relativos a la voz): el pico (true-peak) de cada SFX = (voice_lufs + voice_crest_db) - rel_db de su categoría (10–13 dB por debajo del pico típico de la voz); además su LUFS no pasa de voice_lufs - lufs_rel (12 dB los < 0,8 s, 14 hasta 2 s, 16 los largos). Tope duro: pico ≤ -3 dBFS. El `gain` de la categoría es solo el respaldo."
  }
 }

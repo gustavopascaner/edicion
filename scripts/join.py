@@ -40,7 +40,10 @@ def probe(p):
        or (d.get('format',{}).get('tags') or {}).get('com.apple.quicktime.creationdate')
     try: when=datetime.fromisoformat(ct.replace('Z','+00:00')).timestamp() if ct else None
     except Exception: when=None
-    return dict(path=p,dur=float(d['format']['duration']),vcodec=v.get('codec_name'),w=v.get('width'),h=v.get('height'),rot=rot,
+    fl=lambda x:float(x) if x not in (None,'N/A','') else None
+    rf=(lambda n,dn:float(n)/float(dn) if float(dn) else 0)(*(v.get('r_frame_rate') or '0/1').split('/'))
+    vfr=bool(rf) and abs(fps-rf)/rf>0.004
+    return dict(vdur=fl(v.get('duration')),adur=a and fl(a.get('duration')),vfr=vfr,path=p,dur=float(d['format']['duration']),vcodec=v.get('codec_name'),w=v.get('width'),h=v.get('height'),rot=rot,
                 fps=round(fps,2),pix=v.get('pix_fmt'),acodec=a and a.get('codec_name'),ar=a and a.get('sample_rate'),ch=a and a.get('channels'),
                 when=when if when else os.path.getmtime(p),when_src='grabación' if when else 'archivo')
 
@@ -60,7 +63,11 @@ if order=='name':
     if len(ws)==len(P) and ws!=sorted(ws): print('⚠️  el orden por nombre no coincide con la fecha de grabación: revisalo (--order date para usar la fecha)')
 
 KEY=('vcodec','w','h','rot','fps','pix','acodec','ar','ch')
-same=all(all(x[k]==P[0][k] for k in KEY) for x in P) and P[0]['acodec'] is not None
+# Sin recodificar SOLO si además cada parte es CFR y su audio mide lo mismo que su video (±1 fotograma): en modo copy las diferencias
+# de largo de cada parte se acumulan y el audio de las partes siguientes queda corrido (desfase). Ante la duda se recodifica con relleno.
+def clean(x): return not x['vfr'] and x['vdur'] is not None and x['adur'] is not None and abs(x['vdur']-x['adur'])<=1/max(x['fps'],1)
+same=all(all(x[k]==P[0][k] for k in KEY) for x in P) and P[0]['acodec'] is not None and all(clean(x) for x in P)
+if not same and all(all(x[k]==P[0][k] for k in KEY) for x in P): print('ℹ️  las partes tienen fps variable o audio y video de distinto largo: se recodifican para que el audio no se corra')
 name=opts.get('name') or (json.load(open(os.path.join(W,'config.json'))).get('name') if os.path.exists(os.path.join(W,'config.json')) else None) \
      or os.path.basename(os.path.normpath(EDIT)).removesuffix('_EDIT')
 outdir=os.path.join(EDIT,'Assets','Crudo');os.makedirs(outdir,exist_ok=True)

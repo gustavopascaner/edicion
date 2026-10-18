@@ -6,6 +6,8 @@ y registra cada sonido en assets/sfx/catalog.json con su duración y punto de si
 uso:  python3 -I sfx_import.py <archivo.wav> --id ding-2 --cat ding [--anchor peak|onset] [--max 4] [--desc "..."]
       python3 -I sfx_import.py --batch lista.json      (lista de {src,id,cat,anchor,max,desc})
       python3 -I sfx_import.py --list                  (muestra el catálogo)
+Después de importar: python3 -I sfx_audit.py  (verifica anchor, clics, picos y el nivel que va a tener en la mezcla).
+Sonidos propios sintetizados con ffmpeg: sfx_synth.py.
 anchor: momento del sonido que cae justo en el evento (peak = golpe más fuerte, onset = arranque).
 """
 import os as _o,sys as _s,subprocess as _sp
@@ -50,7 +52,7 @@ def add(c,src,id,cat,anchor='peak',desc='',**kw):
     s2=shape(out);I2,P2=loudness(out)
     c['sounds'][id]=dict(cat=cat,file=rel,dur=round(s2['dur'],3),anchor=round(s2['peak'] if anchor=='peak' else 0.0,3),
                          anchor_mode=anchor,lufs=I2,tp=P2,desc=desc,source=os.path.basename(src))
-    c['categories'].setdefault(cat,{'gain':0.35,'auto':False,'desc':''})
+    c['categories'].setdefault(cat,{'gain':0.25,'auto':False,'desc':'','rel_db':12,'tail':1.5})   # rel_db = dB bajo el pico de la voz · tail = s máx. de cola tras el golpe (ver catalog.levels)
     print(f"{id:18s} {cat:10s} {s2['dur']:5.2f}s  anchor {c['sounds'][id]['anchor']:5.2f}  {I2:6.1f} LUFS  {P2:5.1f} dBTP")
 
 if __name__=='__main__':
@@ -58,7 +60,7 @@ if __name__=='__main__':
     if not args or args[0] in('-h','--help'): print(__doc__);sys.exit()
     if args[0]=='--list':
         for k,v in c['categories'].items():
-            print(f"\n{k}  (gain {v['gain']}) {v.get('desc','')}")
+            print(f"\n{k}  (gain {v['gain']}, {v.get('rel_db','?')} dB bajo la voz, cola {v.get('tail','-')} s) {v.get('desc','')}")
             for i,s in c['sounds'].items():
                 if s['cat']==k: print(f"   {i:18s} {s['dur']:5.2f}s  anchor {s['anchor']:5.2f}  {s['desc']}")
         sys.exit()

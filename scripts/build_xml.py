@@ -19,7 +19,7 @@ def url(p):   # macOS: file://localhost/Users/... · Windows: file://localhost/C
     if re.match(r'^[A-Za-z]:/',p): p='/'+p
     return 'file://localhost'+urllib.parse.quote(p,safe='/')
 def fr(x): return int(round(x*FPS))
-def probe_frames(p): return int(float(subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',p],capture_output=True,text=True).stdout)*FPS)
+def probe_frames(p): return int(round(float(subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',p],capture_output=True,text=True).stdout)*FPS))
 SRC_FRAMES=probe_frames(SRC)
 uid=[0]
 def nid(p): uid[0]+=1; return f'{p}-{uid[0]}'
@@ -39,6 +39,12 @@ def motion(scale,kf=None):
 def level(g):
     return ('<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype>'
             f'<parameter><parameterid>level</parameterid><name>Level</name><valuemin>0.00001</valuemin><valuemax>31.6228</valuemax><value>{g}</value></parameter></effect></filter>')
+def level_kf(g,cin,cout,fi,fo,vmin=0.00001):
+    # fade de 1 fotograma (33 ms) SOLO en cortes reales, dentro del margen de silencio que deja edl.py: saca el clic del empalme sin tocar la voz
+    pts=[(cin,vmin if fi else g)]+([(cin+1,g)] if fi and cout-cin>3 else [])+([(cout-1,g)] if fo and cout-cin>3 else [])+[(cout,vmin if fo else g)]
+    return ('<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype>'
+            f'<parameter><parameterid>level</parameterid><name>Level</name><valuemin>0.00001</valuemin><valuemax>31.6228</valuemax><value>{g}</value>'
+            +''.join(f'<keyframe><when>{w}</when><value>{v}</value></keyframe>' for w,v in pts)+'</parameter></effect></filter>')
 def clip(cid,name,fx,start,end,cin,cout,dur,extra='',srctrack=None):
     st=f'<sourcetrack><mediatype>audio</mediatype><trackindex>{srctrack}</trackindex></sourcetrack>' if srctrack else ''
     return (f'<clipitem id="{cid}"><name>{escape(name)}</name><enabled>TRUE</enabled><duration>{dur}</duration>{RATE}'
@@ -78,18 +84,26 @@ for c in edl['clips']:
     nm=f'{i:02d} · '+c['text'][:40]
     v1.append(clip(vid,nm,fel(),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],FR_,mot+link))
     # config.voice_gain_db: ganancia de la voz del crudo (crudos grabados muy bajos)
-    vg=(level(round(10**(cfg['voice_gain_db']/20),4)) if cfg.get('voice_gain_db') else '')
+    gdb=round(10**(cfg['voice_gain_db']/20),4) if cfg.get('voice_gain_db') else 1
+    vg=level_kf(gdb,c['src_in'],c['src_out'],c.get('fade_in',True),c.get('fade_out',True))
     a1.append(clip(aid,nm,fel(),c['tl_in'],c['tl_out'],c['src_in'],c['src_out'],FR_,link+vg,srctrack=1))
 v2=[]
 for b in br['broll']:
     m=cfg['broll'][b['src']];p=m['path'];s=fr(b['start']);n=fr(b['dur'])
+    # tratamientos (render.js → b.fx/b.box): el b-roll llena el agujero box=[x,y,w,h] del marco (o la ventanita pip) con Basic Motion: escala + centro
+    # (centro de FCP7 = desplazamiento normalizado desde el medio del cuadro: x/1080, y/1920). Sin box = pantalla completa, como siempre.
+    BX=b.get('box');bw,bh=(BX[2],BX[3]) if BX else (1080,1920)
+    CEN=(f'<parameter authoringApp="PremierePro"><parameterid>center</parameterid><name>Center</name><value><horiz>{round((BX[0]+bw/2-540)/1080,4)}</horiz><vert>{round((BX[1]+bh/2-960)/1920,4)}</vert></value></parameter>') if BX else ''
+    mo=lambda sc,kf=None: motion(sc,kf).replace('</effect></filter>',CEN+'</effect></filter>')
     if m.get('still'):
-        base=round(max(1080/m['w'],1920/m['h'])*100,1);k0,k1=b.get('kb') or [100,100]
+        base=round(max(bw/m['w'],bh/m['h'])*100,1);k0,k1=b.get('kb') or [100,100]
         v2.append(clip(nid('still'),os.path.basename(p),file_el(f"f-{b['src']}-{s}",p,n,True,False,m['w'],m['h']),s,s+n,0,n,n,
-                       motion(round(base*k0/100,1),[(0,round(base*k0/100,1)),(n,round(base*k1/100,1))])))
+                       mo(round(base*k0/100,1),[(0,round(base*k0/100,1)),(n,round(base*k1/100,1))])))
     else:
-        r=m.get('rate',FPS);nf=m['frames'];cin=fr(b['sin']);sc=round(max(1080/m['w'],1920/m['h'])*100+0.3,1)
-        v2.append(clip(nid('broll'),('PREVIEW_' if (m.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(p),file_el('f-'+b['src'],p,nf,True,False,m['w'],m['h'],rate=r),s,s+n,cin,cin+n,round(nf*FPS/r),motion(sc)))
+        r=m.get('rate',FPS);nf=m['frames'];cin=fr(b['sin']);sc=round(max(bw/m['w'],bh/m['h'])*100+0.3,1)
+        kv=b.get('kb') if b.get('fx') else None   # Ken Burns en video solo con fx ('push' o marcos): los proyectos viejos quedan igual
+        v2.append(clip(nid('broll'),('PREVIEW_' if (m.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(p),file_el('f-'+b['src'],p,nf,True,False,m['w'],m['h'],rate=r),s,s+n,cin,cin+n,round(nf*FPS/r),
+                       mo(round(sc*kv[0]/100,1),[(cin,round(sc*kv[0]/100,1)),(cin+n,round(sc*kv[1]/100,1))]) if kv else mo(sc)))
 def place(flt,folder):
     tracks=[]
     for j in sorted([j for j in jobs if flt(j)],key=lambda j:j['start']):
@@ -112,25 +126,38 @@ def put(item,s,e):
         if t['end']<=s: break
     else: t={'end':0,'items':[]};st.append(t)
     t['items'].append(item);t['end']=e
+def sfx_level(g,cin,cout,fi,fo):
+    # Audio Levels con fade-in/fade-out cortos (keyframes en fotogramas del ARCHIVO fuente, como la música/V1): sin clic al cortar un sonido antes de su final o arrancarlo adentro
+    n=cout-cin;fi=min(fi,max(0,n//2));fo=min(fo,max(0,n//2));v0='0.00001'
+    pts=([(cin,v0),(cin+fi,g)] if fi else [])+([(cout-fo,g),(cout,v0)] if fo else [])
+    if not pts: return level(g)
+    return ('<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype>'
+            f'<parameter><parameterid>level</parameterid><name>Level</name><valuemin>0.00001</valuemin><valuemax>31.6228</valuemax><value>{g}</value>'
+            +''.join(f'<keyframe><when>{w}</when><value>{v}</value></keyframe>' for w,v in pts)+'</parameter></effect></filter>')
 for x in sfx:
-    p=os.path.join(EDIT,'Assets','SFX',x['id']+'.wav');s=fr(x['start']);n=max(1,fr(x['dur']));cin=fr(x['sin']);fd=max(fr(x['fdur']),cin+n)
-    put(clip(nid('sfx'),x['id'],file_el('f-sfx-'+x['id'],p,fd,False,True),s,s+n,cin,cin+n,fd,level(x['gain']),srctrack=1),s,s+n)
+    p=os.path.join(EDIT,'Assets','SFX',x['id']+'.wav');n=max(1,fr(x['dur']));cin=fr(x['sin']);fd=max(fr(x['fdur']),cin+n)
+    # el golpe (anchor) cae en el fotograma del evento: se redondea el inicio DESPUÉS de fijar el punto de entrada (error ≤ medio fotograma)
+    s=max(0,int(round((x['at']-x['anchor']+cin/FPS)*FPS))) if 'anchor' in x and 'at' in x else fr(x['start'])
+    fi=max(1,fr(x.get('fade_in',0))) if x.get('fade_in') else 0;fo=max(2,fr(x.get('fade_out',0))) if x.get('fade_out') else 0
+    put(clip(nid('sfx'),x['id'],file_el('f-sfx-'+x['id'],p,fd,False,True),s,s+n,cin,cin+n,fd,sfx_level(x['gain'],cin,cin+n,fi,fo),srctrack=1),s,s+n)
 for x in br['extraSfx']:
     p=x['file'];s=fr(x['start']);n=fr(x['dur']);cin=fr(x['sin']);fd=probe_frames(p)
     put(clip(nid('sfx'),os.path.basename(p),file_el('f-x-'+p,p,fd,False,True),s,s+n,cin,cin+n,fd,level(x['gain']),srctrack=1),s,s+n)
 # Música (config.music = {path, dur, bed_gain, offset}): volumen PAREJO todo el video (pedido del usuario: ni más alta al principio ni al final), solo fade-out final
 mtrack=[];M=cfg.get('music')
 if isinstance(M,dict) and M.get('path'):
-    tot=edl['total'];mf=fr(M.get('dur') or probe_frames(M['path'])/FPS);off=fr(M.get('offset',0));n=min(tot,mf-off)
-    bg=M.get('bed_gain',.08)
+    MP=M.get('bed') if M.get('bed') and os.path.exists(M['bed']) else M['path']   # mix.py deja una cama ya recortada, con EQ y al nivel justo (voz − 18 LU): nivel 1.0 y sin offset
+    BED=MP!=M['path']
+    tot=edl['total'];mf=fr(probe_frames(MP)/FPS) if BED else fr(M.get('dur') or probe_frames(M['path'])/FPS);off=0 if BED else fr(M.get('offset',0));n=min(tot,mf-off)
+    bg=1.0 if BED else M.get('bed_gain',.08)
     if 'hook_gain' in M or 'outro_gain' in M: print('ℹ️  hook_gain/outro_gain se ignoran: la música va pareja en bed_gain todo el video')
     kf=[(0,bg),(max(0,n-fr(.8)),bg),(n,0.0001)]
     kf=[(w,g) for k,(w,g) in enumerate(kf) if k==0 or w>kf[k-1][0]]
     lv=('<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype>'
         '<parameter><parameterid>level</parameterid><name>Level</name><valuemin>0.00001</valuemin><valuemax>31.6228</valuemax><value>'+str(bg)+'</value>'
         +''.join(f'<keyframe><when>{off+w}</when><value>{g}</value></keyframe>' for w,g in kf)+'</parameter></effect></filter>')
-    nm=('PREVIEW_' if (M.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(M['path'])
-    mtrack=[clip(nid('music'),nm,file_el('f-music',M['path'],mf,False,True),0,n,off,off+n,mf,lv,srctrack=1)]
+    nm=('PREVIEW_' if (M.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(MP)
+    mtrack=[clip(nid('music'),nm,file_el('f-music',MP,mf,False,True),0,n,off,off+n,mf,lv,srctrack=1)]
     if mf-off<tot: print(f'⚠️  la música dura menos que el video ({(mf-off)/FPS:.1f}s < {tot/FPS:.1f}s)')
 SG=lambda i:[c for c in edl['clips'] if c['seg']==i][0]['tl_in']
 mk=''.join(f'<marker><comment></comment><name>{escape(n)}</name><in>{SG(sg)}</in><out>-1</out></marker>' for n,sg in cfg.get('markers',[]))
@@ -148,5 +175,7 @@ def tc(f):
 os.makedirs(os.path.join(EDIT,'Assets','Subtitulos'),exist_ok=True)
 open(os.path.join(EDIT,'Assets','Subtitulos',f'{NAME}_v{VER}_subtitulos.srt'),'w').write('\n'.join(f"{k}\n{tc(c['tl_in'])} --> {tc(c['tl_out'])}\n{c['text']}\n" for k,c in enumerate(edl['caps'],1)))
 import xml.dom.minidom;xml.dom.minidom.parse(out)   # valida que el XML esté bien formado
+_r=subprocess.run([sys.executable,'-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'sync_check.py'),W]);print()
+if _r.returncode: sys.exit('✗ La auditoría de sincronía falló: NO entregar este XML hasta resolverlo (ver arriba)')
 print('XML',out,'· pistas de video',len([t for t in vtracks if t]),'· pistas SFX',len(st),'· duración %.1fs'%(edl['total']/FPS))
 timing.log(W,'XML para Premiere',time.time()-T0)

@@ -11,6 +11,7 @@ uso:
   envato.py use <work> <clave> <búsqueda>#<n> [--preview]  (ej. kl video_doctor-talking#3) → registra la elección en config.json
         (broll[clave] o music) como PENDIENTE de descarga; --preview = usar la vista previa con marca de agua (solo si no se puede licenciar ya)
   envato.py collect <work> [--from ~/Downloads] [--wait 300] [--file <clave> <archivo>]  → toma los originales licenciados de Descargas
+        (los copia a Assets/Envato y borra de Descargas lo bajado, para no duplicar)
         (--wait = esperar hasta N s a que terminen de bajar)
   envato.py report <work>                          → tabla de procedencia (para el LEEME)
 """
@@ -151,6 +152,7 @@ def _collect(W,src,manual=None):
             if not cands: print(f'… {k}: todavía no está en {src} ({e["title"]})');continue
             found=max(cands,key=os.path.getmtime);sz=os.path.getsize(found);time.sleep(1)
             if os.path.getsize(found)!=sz: print(f'… {k}: todavía bajando');continue
+        dl=found   # lo descargado (archivo o zip): se borra de Descargas cuando el original ya quedó copiado en Assets
         if found.lower().endswith('.zip'):
             shutil.rmtree(tmp,ignore_errors=True);zipfile.ZipFile(found).extractall(tmp)
             media=[os.path.join(r,f) for r,_,fs in os.walk(tmp) for f in fs if '__MACOSX' not in r and f.lower().endswith(VID if e['kind']=='video' else AUD)]
@@ -162,6 +164,8 @@ def _collect(W,src,manual=None):
         if e['kind']=='video': b.update(path=out,frames=p['frames'],rate=p['rate'],w=p['w'],h=p['h'])
         else: b.update(path=out,dur=round(p['dur'],2))
         e.update(status='licensed',file=out);print(f'✓ {k}: original licenciado → {out}')
+        if os.path.dirname(os.path.abspath(dl))==os.path.abspath(src) and os.path.getsize(out)==os.path.getsize(found):
+            os.remove(dl);print(f'  borrado de {src}: {os.path.basename(dl)} (ya está en Assets)')
     shutil.rmtree(tmp,ignore_errors=True);cfgio(W,c)
     pend=[k for k,b in entries(c) if b['envato']['status']!='licensed']
     print('pendientes:',', '.join(pend) if pend else 'ninguno ✓');return pend

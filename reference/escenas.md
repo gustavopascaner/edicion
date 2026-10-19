@@ -39,7 +39,7 @@ Helper `H('texto')` = resaltado naranja dentro de líneas `disp`.
 | escena | params |
 |---|---|
 | `fsTitle` | `kick, lines:[html], size?, top?, bg?, accent?, color?, kickColor?, kickDot?, marks? (n ✕), marksAt?, sub?, skin?` — fondos: ink (default), `bg:'var(--hot)',color:'var(--ink)'` naranja, `bg:'var(--paper)'` · skins `split` (`bg2?, mid?`) `stack` (`echo?, max?, width?`) `ticker` (`tick?`) |
-| `bigword` | `kick, lines:[2], size?, sub?, subAt?` — palabra partida letra por letra ("PREVISI-/BILIDAD", "ESTÁS/JODIDO.") |
+| `bigword` | `kick, lines:[2], size?, sub?, subAt?` — palabras que entran letra por letra, una o dos por renglón ("ESTÁS/JODIDO."). **Nunca partir una palabra con guion entre renglones** (nada de "PREVISI-/BILIDAD"): la palabra larga va entera en su renglón y el motor achica el tamaño para que entre |
 | `counter` | `kick, to, countEnd, pillAt, strikeAt` — contador de seguidores tachado |
 | `metrics` | `kick, tiles:[{l, v, at, fmt:'k'|'m'}], stampAt` — métricas de vanidad ≠ PACIENTES |
 | `calendar` | `qAt` — "EL MES QUE VIENE ¿?" |

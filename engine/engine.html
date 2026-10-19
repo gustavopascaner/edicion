@@ -3,13 +3,14 @@
 @font-face{font-family:Inter;src:url(fonts/InterTight.ttf);font-weight:100 900}
 @font-face{font-family:Mono;src:url(fonts/JetBrainsMono.ttf);font-weight:100 800}
 @font-face{font-family:Serif;src:url(fonts/InstrumentSerif-Italic.ttf);font-style:italic}
-:root{--ink:#0E0D0C;--ink2:#1B1A18;--paper:#F3EEE5;--hot:#FF5A1F;--lime:#D4FF3A;--mute:#8C857A;
+:root{--ink:#0E0D0C;--ink2:#1B1A18;--paper:#F3EEE5;--hot:#FF5A1F;--lime:#D4FF3A;--alt:#D4FF3A;--mute:#8C857A;
  /* tonos derivados (papel→tinta); con una marca se recalculan desde sus colores (scripts/brand.js) */
  --p1:#EFEAE0;--p2:#E9E3D8;--p3:#E6DFD2;--p4:#E2DACB;--p5:#DDD5C7;--p6:#CFC6B6;--t1:#a49d92;--t2:#6c665d;
  --d1:#1c1b19;--d2:#2e2c29;--d3:#3a3834;--d4:#4a463f;--d5:#57524a}
 html,body{margin:0;width:1080px;height:1920px;background:transparent;overflow:hidden}
 #stage{position:absolute;inset:0;overflow:hidden}
 *{box-sizing:border-box}
+#stage,#stage *{hyphens:none;-webkit-hyphens:none;overflow-wrap:normal;word-break:normal}
 .disp{font-family:Brico;font-weight:800;font-stretch:76%;letter-spacing:-.02em;line-height:.9;text-transform:uppercase}
 .mono{font-family:Mono;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .ui{font-family:Inter}
@@ -304,9 +305,11 @@ SC.bigword=p=>{
  const f=FS(p.bg||'var(--ink)',p.accent);h('div','',f.m,null,'grid');
  const w=h('div',`position:absolute;left:70px;right:70px;top:${p.top||560}px;color:var(--paper)`,f.c);
  const k=kick(w,p.kick);k.style.fontSize='30px';
- const lines=p.lines.map(s=>{const m=h('div',`font-size:${p.size||230}px;color:${p.color||'var(--hot)'};overflow:hidden;padding:.16em 0 .04em;margin:-.16em 0 -.04em`,w,null,'disp');const d=h('div','',m,s);return split(d)});
+ const lines=p.lines.map(s=>{const m=h('div',`font-size:${p.size||230}px;color:${p.color||'var(--hot)'};overflow:hidden;padding:.16em 0 .04em;margin:-.16em 0 -.04em`,w,null,'disp');const d=h('div','white-space:nowrap;width:max-content',m,s);const cs=split(d);cs.m=m;cs.d=d;return cs});
+ // palabra entera en un renglón: si no entra en el ancho, se achica todo el bloque (nunca se parte)
+ let fitted=0;const fit=()=>{const av=w.clientWidth;let r=1;lines.forEach(cs=>{r=Math.min(r,av/Math.max(1,cs.d.scrollWidth));});if(r<1)lines.forEach(cs=>cs.m.style.fontSize=(p.size||230)*r*.98+'px');fitted=1;};
  const sub=p.sub?ml(w,p.sub,'font-size:80px;margin-top:40px;color:var(--paper)','serif'):null;
- return t=>{f.upd(t);k.style.opacity=P(t,.25,.2);let n=0;
+ return t=>{if(!fitted)fit();f.upd(t);k.style.opacity=P(t,.25,.2);let n=0;
   lines.forEach(cs=>cs.forEach(c=>{const x=E.expo(P(t,.25+n*.035,.6));c.style.transform=`translateY(${(1-x)*110}%)`;n++;}));
   if(sub)rise(sub,t,p.subAt||.9);};
 };
@@ -842,7 +845,7 @@ function pat(g,kind,col=FG,s=18){const id='pt'+Math.floor(Math.random()*1e9),df=
 function cutout(el,rot=0){el.style.filter='drop-shadow(10px 14px 0 rgba(0,0,0,.28))';el.style.transformBox='fill-box';el.style.transformOrigin='center';if(rot)el.style.rotate=rot+'deg';return el;}
 // SC.concept (pantalla completa): animación conceptual SIN texto, 3–4 s. p:{at (local), bg:'ink'|'hot'|'paper', seed?, top?, grid?, …lo que use concept.js}
 //   composición: ox/oy (px) y scale → descentrar o hacer sangrar por el borde · persp:{rx,ry,rz} o 'iso' → lienzo inclinado en 3D · grain:'heavy' → textura fotográfica
-const CTH={ink:['var(--ink)','var(--paper)','var(--hot)','var(--lime)'],hot:['var(--hot)','var(--ink)','var(--lime)','var(--ink)'],paper:['var(--paper)','var(--ink)','var(--hot)','var(--hot)']};
+const CTH={ink:['var(--ink)','var(--paper)','var(--hot)','var(--lime)'],hot:['var(--hot)','var(--ink)','var(--lime)','var(--ink)'],paper:['var(--paper)','var(--ink)','var(--hot)','var(--hot)'],alt:['var(--alt)','var(--paper)','var(--hot)','var(--ink)']};
 SC.concept=p=>{const [bg,fg,hl,hl2]=CTH[p.bg||'ink'],f=FS(bg,p.bg==='hot'?'var(--ink)':p.bg==='paper'?'var(--ink)':'var(--hot)');
  f.m.style.setProperty('--fg',fg);f.m.style.setProperty('--hl',hl);f.m.style.setProperty('--hl2',hl2);if(p.grid!==false)h('div','',f.m,null,p.bg==='paper'?'gridp':'grid').style.zIndex=0;
  const wrap=h('div','position:absolute;left:40px;top:'+(p.top||420)+'px;width:1000px;height:1000px',f.c);f.m.style.setProperty('--bgc',bg);
@@ -919,7 +922,14 @@ function avoidFace(){const SF=window.SAFE;if(!SF||!SF.face)return null;const r=c
  if(!best)return {mode:'sin lugar'};
  S.style.transformOrigin=`${(r.left+r.right)/2}px ${r.top}px`;S.style.transform=`translateY(${best.top-r.top}px) scale(${best.sc})`;
  return {mode:'movido',scale:+best.sc.toFixed(2),from:Math.round(r.top),to:Math.round(best.top)};}
-window.setup=(name,p,dur)=>{S.innerHTML='';S.style.transform='';DUR=dur;MOT=p.motion||null;UPD=SC[name](p);
+// Nunca palabras partidas con guion en dos renglones: ["PREVISI-","BILIDAD"] → ["PREVISIBILIDAD"]; también saca guiones blandos
+const _txt=x=>x.replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ');
+function unhyph(v){if(typeof v==='string')return v.replace(/­|&shy;/g,'');
+ if(Array.isArray(v)){const o=[];for(const x0 of v){const x=unhyph(x0);const pr=o[o.length-1];
+   if(typeof x==='string'&&typeof pr==='string'&&/\p{L}[-‐‑]\s*$/u.test(_txt(pr))&&/^\s*\p{L}/u.test(_txt(x)))o[o.length-1]=pr.replace(/[-‐‑](\s*(?:<\/[^>]+>\s*)*)$/,'$1')+x.replace(/^\s+/,'');
+   else o.push(x);}return o;}
+ if(v&&typeof v==='object'){for(const k in v)v[k]=unhyph(v[k]);}return v;}
+window.setup=(name,p,dur)=>{p=unhyph(p);S.innerHTML='';S.style.transform='';DUR=dur;MOT=p.motion||null;UPD=SC[name](p);
  if(!p._place)return null;FRAME=0;UPD(Math.max(0,dur-.4));return avoidFace();};
 window.frame=(t,f)=>{FRAME=f;UPD(t);};
 </script></body></html>

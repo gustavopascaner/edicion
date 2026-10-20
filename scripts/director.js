@@ -60,6 +60,7 @@ if(B.length&&B.length<2)W(`Hay ${B.length} b-roll: el objetivo son 2–4 momento
 {const ev=B.filter(b=>((cfg.broll||{})[b.src]||{}).envato).length;if(ev>4)W(`Hay ${ev} b-rolls de Envato: el objetivo son 2–4; quedarse con los que más amplían lo que se dice.`);}
 if(B.length>=2){const s=B.map(b=>b.start).sort((a,b)=>a-b);if(s[s.length-1]-s[0]<T*0.35)W('Los b-rolls están amontonados: repartirlos a lo largo del video.');}
 for(const f of fsj){const d=f.end-f.start;if(f.scene==='concept'){if(d<2.8||d>4.6)W(`Pantalla conceptual ${f.id} dura ${f2(d)}: ideal 3–4 s.`);}else if(d<0.8||d>3.6)W(`Pantalla completa ${f.id} dura ${f2(d)}: ideal 1–3 s.`);}
+{const bgs=fsj.map(f=>BGN(f.p.bg)),dk=bgs.filter(b=>b==='ink').length;if(dk>0&&dk/bgs.length>0.34)W(`Demasiados fondos oscuros: ${dk} de ${bgs.length} pantallas completas en ink. Predominan los claros (paper), algún hot y el ink solo eventualmente (máx. 1 de cada 3); no repetir el mismo fondo seguido.`);}
 {const cc=fsj.filter(f=>f.scene==='concept');
  if(!cc.length)W('Falta la pantalla conceptual sin texto (escena "concept", 3–4 s): una de las 3 pantallas completas tiene que ilustrar un concepto con una animación nueva (concept.js).');
  else if(cc.some(f=>f.p.motif))W(`Pantalla conceptual reciclada (motivo viejo "${cc.find(f=>f.p.motif).p.motif}"): diseñar y programar una animación nueva para este video en concept.js.`);

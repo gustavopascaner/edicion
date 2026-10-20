@@ -35,13 +35,14 @@ function palette(b){const c=b.colors,a2=c.accent2&&con(c.accent2,c.dark)>=4.5?c.
 // tonos derivados: % de papel sobre tinta, medidos sobre los tonos originales del motor (engine.html :root)
 const MIX={ink2:5.7,p1:98.1,p2:94.9,p3:93,p4:90.6,p5:88.5,p6:81.6,t1:63.8,t2:39.3,d1:6.1,d2:13.7,d3:18.9,d4:25,d5:30.4};
 function css(b){const P=palette(b),f=b.fonts||{},out=[];
-  // mismos nombres de familia que usa el motor: Brico (títulos) · Inter (texto) · Mono (etiquetas) · Serif (acento itálico)
-  const alias={Brico:f.display,Inter:f.body,Mono:f.mono,Serif:f.accent};
+  // mismos nombres de familia que usa el motor: Brico (títulos) · Inter (texto) · Mono (etiquetas) · Serif (= la de lectura; sin tipografía de acento)
+  const alias={Brico:f.display,Inter:f.body,Mono:f.mono,Serif:f.body};   // sin tipografía de acento: lo que antes era Serif usa la de lectura
   for(const [fam,ff] of Object.entries(alias))for(const x of ((ff||f.body||{}).files||[]))
-    out.push(`@font-face{font-family:${fam};src:url("${x.url}");font-weight:${x.weight||400};font-style:${x.style||(fam==='Serif'?'italic':'normal')}}`);
+    out.push(`@font-face{font-family:${fam};src:url("${x.url}");font-weight:${x.weight||400};font-style:${x.style||'normal'}}`);
   const v=[`--ink:${P.ink}`,`--paper:${P.paper}`,`--hot:${P.hot}`,`--lime:${P.lime}`,`--alt:${P.alt}`,`--mute:${P.mute||`color-mix(in srgb,${P.paper} 52%,${P.ink})`}`,
     ...Object.entries(MIX).map(([k,n])=>`--${k}:color-mix(in srgb,${P.paper} ${n}%,${P.ink})`)];
   out.push(`:root{${v.join(';')}}`);
+  out.push(`.serif,[style*="font-family:Serif"]{font-style:normal!important;font-weight:${(f.body||{}).weight||700}!important}`);
   const d=f.display||{};
   out.push(`.disp{font-weight:${d.weight||800};font-stretch:${d.stretch||'100%'};letter-spacing:${d.tracking||'-0.02em'};line-height:${d.leading||.9};text-transform:${d.upper===false?'none':'uppercase'}}`);
   return out.join('\n');}
@@ -97,7 +98,7 @@ if(require.main===module){const [cmd,slug,arg3]=process.argv.slice(2);
       for(const x of list().filter(x=>x.slug!=='editorial'))console.log(`${x.slug.padEnd(20)} ${String(x.name).slice(0,30).padEnd(30)} ${x.colors.dark} ${x.colors.light} ${x.colors.accent} ${x.colors.accent2||''} · ${x.font||'-'}`);}
     else if(cmd==='show'){const b=loadBrand(slug);if(!b){console.log('editorial: el look de siempre del motor');process.exit(0);}
       const P=palette(b),f=b.fonts||{};console.log(`${b.name||slug}\n  colores: ink ${P.ink} · paper ${P.paper} · hot ${P.hot} · lime ${P.lime}`);
-      console.log(`  tipografías: títulos ${(f.display||{}).family} · texto ${(f.body||{}).family} · etiquetas ${(f.mono||{}).family} · acento ${(f.accent||{}).family}`);
+      console.log(`  tipografías: títulos ${(f.display||{}).family} · texto ${(f.body||{}).family} · etiquetas ${(f.mono||{}).family}`);
       console.log(`  subtítulos: activa ${captionColors(b).act} · estilo ${(captionStyle(b)||{style:'box'}).style}${captionStyle(b)?'':' (default; se cambia con "captions":{"style":…} en brand.json o config.caption_style)'}`);}
     else if(cmd==='detect'){const r=detect(slug||'.');if(!r){console.log('(sin marca detectada)');process.exit(2);}console.log(`${r.slug}\t${r.why}`);}
     else if(cmd==='remember'){if(arg3!=='editorial')loadBrand(arg3);const d=fs.statSync(slug).isDirectory()?slug:path.dirname(slug);

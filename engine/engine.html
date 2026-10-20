@@ -221,7 +221,7 @@ FSK.split=p=>{
 };
 // tipografía apilada gigante: cada línea llena el ancho; ecos en contorno que sangran por los bordes y se deslizan
 FSK.stack=p=>{
- const f=FS(p.bg||'var(--ink)',p.accent),col=p.color||(isLight(p.bg)?'var(--ink)':'var(--paper)');
+ const f=FS(p.bg||'var(--paper)',p.accent),col=p.color||(isLight(p.bg)?'var(--ink)':'var(--paper)');
  const w=h('div',`position:absolute;left:0;right:0;top:${p.top||200}px;color:${col}`,f.c);
  let kk=null;if(p.kick){kk=kick(w,p.kick,p.kickDot);kk.style.cssText+=';font-size:30px;margin:0 0 20px 70px;color:inherit';}
  const raw=p.lines,echo=p.echo??2,rows=[];
@@ -238,7 +238,7 @@ FSK.stack=p=>{
 };
 // marquesina: bandas diagonales con el kick repetido corriendo, y el título encima
 FSK.ticker=p=>{
- const f=FS(p.bg||'var(--ink)',p.accent),col=p.color||(isLight(p.bg)?'var(--ink)':'var(--paper)');
+ const f=FS(p.bg||'var(--paper)',p.accent),col=p.color||(isLight(p.bg)?'var(--ink)':'var(--paper)');
  const txt=(p.tick||p.kick||'').replace(/<[^>]+>/g,'')+'  ✦  ';
  const bands=[[260,-7,'var(--hot)','var(--ink)',1],[1480,5,isLight(p.bg)?'var(--ink)':'var(--paper)',isLight(p.bg)?'var(--paper)':'var(--ink)',-1]].map(([y,r,bg,fg,d])=>{
   const b=h('div',`position:absolute;left:-200px;width:1480px;top:${y}px;height:150px;background:${bg};color:${fg};rotate:${r}deg;overflow:hidden;display:flex;align-items:center`,f.c);
@@ -846,7 +846,7 @@ function cutout(el,rot=0){el.style.filter='drop-shadow(10px 14px 0 rgba(0,0,0,.2
 // SC.concept (pantalla completa): animación conceptual SIN texto, 3–4 s. p:{at (local), bg:'ink'|'hot'|'paper', seed?, top?, grid?, …lo que use concept.js}
 //   composición: ox/oy (px) y scale → descentrar o hacer sangrar por el borde · persp:{rx,ry,rz} o 'iso' → lienzo inclinado en 3D · grain:'heavy' → textura fotográfica
 const CTH={ink:['var(--ink)','var(--paper)','var(--hot)','var(--lime)'],hot:['var(--hot)','var(--ink)','var(--lime)','var(--ink)'],paper:['var(--paper)','var(--ink)','var(--hot)','var(--hot)'],alt:['var(--alt)','var(--paper)','var(--hot)','var(--ink)']};
-SC.concept=p=>{const [bg,fg,hl,hl2]=CTH[p.bg||'ink'],f=FS(bg,p.bg==='hot'?'var(--ink)':p.bg==='paper'?'var(--ink)':'var(--hot)');
+SC.concept=p=>{const [bg,fg,hl,hl2]=CTH[p.bg||'paper'],f=FS(bg,p.bg==='hot'?'var(--ink)':p.bg==='paper'?'var(--ink)':'var(--hot)');
  f.m.style.setProperty('--fg',fg);f.m.style.setProperty('--hl',hl);f.m.style.setProperty('--hl2',hl2);if(p.grid!==false)h('div','',f.m,null,p.bg==='paper'?'gridp':'grid').style.zIndex=0;
  const wrap=h('div','position:absolute;left:40px;top:'+(p.top||420)+'px;width:1000px;height:1000px',f.c);f.m.style.setProperty('--bgc',bg);
  {const pr=p.persp==='iso'?{rx:55,rz:-35}:p.persp||null,tf=[];if(pr)tf.push(`perspective(${pr.d||1800}px)`);if(p.ox||p.oy)tf.push(`translate(${p.ox||0}px,${p.oy||0}px)`);
@@ -888,7 +888,7 @@ SC.save=p=>{
 // Premiere muestra el b-roll (escalado/posicionado por build_xml.py en p.box) + decoración + los subtítulos de ese tramo (p.caps).
 // p:{kind:'phone'|'polaroid'|'circle'|'window'|'pip', box:[x,y,w,h], bg:'ink'|'paper'|'hot', label?, caps?, capY?}
 const rrect=(x,y,w,hh,r)=>`M${x+r} ${y}H${x+w-r}A${r} ${r} 0 0 1 ${x+w} ${y+r}V${y+hh-r}A${r} ${r} 0 0 1 ${x+w-r} ${y+hh}H${x+r}A${r} ${r} 0 0 1 ${x} ${y+hh-r}V${y+r}A${r} ${r} 0 0 1 ${x+r} ${y}Z`;
-SC.bframe=p=>{const [x,y,w,hh]=p.box,k=p.kind||'window',bgk=p.bg||(k==='polaroid'?'ink':k==='phone'?'hot':'paper'),bg=`var(--${bgk})`,light=isLight(bg);
+SC.bframe=p=>{const [x,y,w,hh]=p.box,k=p.kind||'window',bgk=p.bg||(k==='polaroid'?'paper':k==='phone'?'hot':'paper'),bg=`var(--${bgk})`,light=isLight(bg);
  const R={phone:62,window:34,polaroid:0,circle:0,pip:0}[k]||0,hole=k==='circle'?`M${x} ${y+hh/2}a${w/2} ${w/2} 0 1 0 ${w} 0a${w/2} ${w/2} 0 1 0 ${-w} 0Z`:rrect(x,y,w,hh,R);
  const deco=[];let lab=null;
  if(k!=='pip'){const bd=h('div',`position:absolute;inset:0;background:${bg};clip-path:path(evenodd,"M0 0H1080V1920H0Z ${hole}")`);h('div','',bd,null,'grain');

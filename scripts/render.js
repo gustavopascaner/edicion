@@ -1,5 +1,5 @@
 // Paso 5: renderiza MG + subtítulos a .mov con alfa (QuickTime Animation).
-// uso: node render.js <workdir> [--only=<regex>] [--test] [--par=6]
+// uso: node render.js <workdir> [--only=<regex>] [--test] [--par=N]   (N por defecto: 6, o menos si hay poca RAM)
 //   --test  : en vez de .mov, exporta PNGs de prueba a <workdir>/test (--t=tiempos, ej --t=end-0.4 o --t=0.5,mid)
 // Lee <workdir>/config.json, edl.json y jobs.js (module.exports = ctx => { ...J(), B(), X()... }).
 const fs=require('fs'),path=require('path'),{spawn}=require('child_process');
@@ -230,12 +230,14 @@ if(jobs.some(j=>j.scene==='concept')){
 async function main(){
   if(!CHROME)throw new Error('No encuentro Chrome. Instalalo o definí CHROME=/ruta/al/ejecutable');
   const only=process.argv.find(a=>a.startsWith('--only='));const test=process.argv.includes('--test');
-  const par=+((process.argv.find(a=>a.startsWith('--par='))||'--par=6').slice(6));
+  // pestañas de Chrome en paralelo: 6 por defecto, menos si hay poca RAM (~2,4 GB por pestaña a 1080×1920; 8 GB → 3, 16 GB → 6)
+  const parDef=Math.max(2,Math.min(6,Math.floor(require('os').totalmem()/2**30/2.4)));
+  const par=+((process.argv.find(a=>a.startsWith('--par='))||'--par='+parDef).slice(6));
   let list=jobs;if(only){const re=new RegExp(only.slice(7));list=jobs.filter(j=>re.test(j.id));}
   const A=path.join(cfg.edit_dir,'Assets');
   const outFor=j=>test?path.join(WD,'test'):path.join(A,j.track==='cap'?'Subtitulos':'MG');
   [path.join(A,'MG'),path.join(A,'Subtitulos'),path.join(WD,'test')].forEach(d=>fs.mkdirSync(d,{recursive:true}));
-  const browser=await puppeteer.launch({executablePath:CHROME,headless:true,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
+  const browser=await puppeteer.launch({executablePath:CHROME,headless:true,protocolTimeout:900000,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
     await page.goto(fileURL(path.join(ENG,'engine.html')));{const k=await BRAND.apply(page,BR);if(k&&k<.98&&!FIT_SAID){FIT_SAID=1;console.log(`marca: la tipografía de títulos es más ancha que la del motor → títulos al ${Math.round(k*100)} %`);}}await page.evaluate(()=>document.fonts.ready);
@@ -255,7 +257,7 @@ async function main(){
       const ff=spawn('ffmpeg',['-v','error','-y','-f','image2pipe','-framerate',String(FPS),'-c:v','png','-i','-','-c:v','qtrle','-pix_fmt','argb',outf]);
       const done=new Promise(r=>ff.on('close',r));
       for(let f=0;f<nf;f++){await page.evaluate((t,f)=>frame(t,f),f/FPS,f);
-        const buf=await page.screenshot({omitBackground:true,type:'png',optimizeForSpeed:true});
+        let buf;for(let k=0;;k++){try{buf=await page.screenshot({omitBackground:true,type:'png'});break;}catch(e){if(k>=2)throw e;}}  // Windows: captureScreenshot a veces se cuelga
         if(!ff.stdin.write(buf))await new Promise(r=>ff.stdin.once('drain',r));}
       ff.stdin.end();await done;console.log('ok',j.id,nf+'f');}
     await page.close();}

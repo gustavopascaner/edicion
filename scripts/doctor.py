@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Chequea que esté todo lo necesario para la skill (macOS y Windows). Sale con código 1 si falta algo.
-uso: python3 -I doctor.py      (Windows: py -3 -I doctor.py)
+uso: python3 -I doctor.py      (Windows: py -3 -X utf8 -I doctor.py)
 """
 import os as _o,sys as _s,subprocess as _sp
 if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8

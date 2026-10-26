@@ -175,7 +175,7 @@ def tc(f):
 os.makedirs(os.path.join(EDIT,'Assets','Subtitulos'),exist_ok=True)
 open(os.path.join(EDIT,'Assets','Subtitulos',f'{NAME}_v{VER}_subtitulos.srt'),'w').write('\n'.join(f"{k}\n{tc(c['tl_in'])} --> {tc(c['tl_out'])}\n{c['text']}\n" for k,c in enumerate(edl['caps'],1)))
 import xml.dom.minidom;xml.dom.minidom.parse(out)   # valida que el XML esté bien formado
-_r=subprocess.run([sys.executable,'-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'sync_check.py'),W]);print()
+_r=subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'sync_check.py'),W]);print()
 if _r.returncode: sys.exit('✗ La auditoría de sincronía falló: NO entregar este XML hasta resolverlo (ver arriba)')
 print('XML',out,'· pistas de video',len([t for t in vtracks if t]),'· pistas SFX',len(st),'· duración %.1fs'%(edl['total']/FPS))
 timing.log(W,'XML para Premiere',time.time()-T0)

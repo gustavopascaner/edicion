@@ -94,4 +94,4 @@ if '--no-verify' not in sys.argv:
     cut=os.path.join(W,'cut.wav')
     subprocess.run(['ffmpeg','-v','error','-y','-i',os.path.join(W,'audio16k.wav'),'-/filter_complex',os.path.join(W,'fc_cut.txt'),'-map','[out]',cut],check=True)
     print('\n--- verificación del corte (Whisper SIN prompt, tiempos por palabra) ---')
-    subprocess.run([sys.executable,'-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'align.py'),W])
+    subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'align.py'),W])

@@ -48,7 +48,7 @@ Si falta Homebrew, el instalador lo instala (pide la contraseña de la Mac una v
 ### Actualizar y chequear
 
 - Actualizar: `git pull` dentro de la carpeta clonada.
-- Chequear que esté todo: `python3 -I scripts/doctor.py` (Windows: `py -3 -I scripts\doctor.py`).
+- Chequear que esté todo: `python3 -I scripts/doctor.py` (Windows: `py -3 -X utf8 -I scripts\doctor.py`).
 
 ## Uso
 

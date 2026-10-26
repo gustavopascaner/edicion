@@ -82,7 +82,7 @@ foreach ($d in @("$HOME\.codex\skills", "$HOME\.claude\skills")) {
 
 # 7 · Chequeo final
 Write-Host ""
-py -3 -I (Join-Path $SK "scripts\doctor.py")
+py -3 -X utf8 -I (Join-Path $SK "scripts\doctor.py")
 Write-Host ""
 Write-Host "Listo. En Codex: `$edicion <video>   ·   En Claude Code: /edicion <video>"
 Write-Host "Si algo figura con una X, cerrá y abrí la terminal y volvé a correr este script."

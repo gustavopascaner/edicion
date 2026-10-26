@@ -17,7 +17,7 @@ norm=lambda s:re.sub(r'[^a-z0-9ñ]','',unicodedata.normalize('NFD',s.lower()).re
 base=os.path.join(W,'cut_words');js=base+'.json'
 for dtw in (['-dtw','large.v3.turbo'],[]):
     if os.path.exists(js): os.unlink(js)
-    subprocess.run([WHISPER,'-m',MODEL,'-f',cut,'-l','es','-np','-t','8','-ml','1','-sow','-ojf','-of',base]+dtw,capture_output=True)
+    subprocess.run([WHISPER,'-m',MODEL,'-f',cut,'-l','es','-np','-t',str(min(8,os.cpu_count() or 4)),'-ml','1','-sow','-ojf','-of',base]+dtw,capture_output=True)
     if os.path.exists(js): break
 if not os.path.exists(js): sys.exit('✗ Whisper no generó tiempos por palabra: no se pudo verificar el corte')
 asr=[]

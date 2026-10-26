@@ -89,7 +89,8 @@ HOP=0.005;SR=8000
 def env(p,trim=0.0):
     tmp=tempfile.mkdtemp();f=os.path.join(tmp,'a.wav')
     subprocess.run(['ffmpeg','-v','error','-y','-i',p,'-vn','-ac','1','-ar',str(SR),'-c:a','pcm_s16le',f],check=True)
-    w=wave.open(f);raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw);n=int(SR*HOP)
+    with wave.open(f) as w: raw=w.readframes(w.getnframes())
+    S=struct.unpack('<%dh'%(len(raw)//2),raw);n=int(SR*HOP)
     e=[math.log10(1+math.sqrt(sum(x*x for x in S[i*n:(i+1)*n])/n)) for i in range(len(S)//n)]
     os.unlink(f);os.rmdir(tmp);return e
 eo,em=env(SRC),env(OUT)

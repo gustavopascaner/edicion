@@ -39,9 +39,14 @@ for a,b in big:
 if dur-prev>0.2: chunks.append((prev,dur))
 def tr(a,b,f,prompt=None):
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.08)),'-to',str(b+0.08),'-i',A,f])
-    cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t','8','-np']
+    cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t',str(min(8,os.cpu_count() or 4)),'-np']
     if prompt: cmd+=['--prompt',prompt]
-    subprocess.run(cmd,capture_output=True);return open(f[:-4]+'.txt').read().strip().replace('\n',' ')
+    o=f[:-4]+'.txt'
+    if os.path.exists(o): os.remove(o)  # no reusar el .txt de una corrida anterior
+    for _ in range(3):  # whisper-cli a veces termina sin escribir el .txt (Windows): reintentar
+        subprocess.run(cmd,capture_output=True)
+        if os.path.exists(o): return open(o,encoding='utf-8').read().strip().replace('\n',' ')
+    print(f'⚠️  sin transcripción para {os.path.basename(f)}',file=sys.stderr);return ''
 res=[]
 for ci,(a,b) in enumerate(chunks):
     full=tr(a,b,os.path.join(W,'sub',f'c{ci:02d}.wav'))

@@ -12,3 +12,14 @@ exports.fileURL=p=>pathToFileURL(p).href;
 exports.logTime=(WD,step,secs)=>{try{const f=path.join(WD,'timing.json');let d={start:null,steps:[]};
   try{d=JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){}
   d.steps.push({step,secs:+secs.toFixed(1),at:Math.round(Date.now()/1000)});fs.writeFileSync(f,JSON.stringify(d,null,1));}catch(e){}};
+// Perfil de hardware: 'potente' (≥ 12 GB de RAM, ej. Mac M) o 'liviano' (notebooks de 8 GB, ej. la Windows de Javier).
+// Se puede forzar con --perfil=liviano|potente, EDICION_PERFIL o "perfil" en config.json.
+exports.perfil=(cfg={})=>{const ram=os.totalmem()/2**30,cpu=os.cpus().length;
+  const arg=(process.argv.find(a=>a.startsWith('--perfil='))||'').slice(9);
+  const name=arg||process.env.EDICION_PERFIL||cfg.perfil||(ram<12?'liviano':'potente');
+  const tabs=Math.max(1,Math.floor(ram/2.4));   // ~2,4 GB por pestaña de Chrome a 1080×1920
+  return name==='liviano'
+    // liviano: pocas pestañas, PNG comprimido (menos RAM y menos tráfico) y paciencia con capturas lentas
+    ? {name,ram,cpu,par:Math.max(2,Math.min(3,tabs)),fastShot:false,protocolTimeout:900000}
+    // potente: 6 pestañas y captura rápida (sin optimizeForSpeed un cuadro con grano tarda 2,2× más en una M5 Pro)
+    : {name,ram,cpu,par:Math.max(2,Math.min(6,tabs)),fastShot:true,protocolTimeout:180000};};

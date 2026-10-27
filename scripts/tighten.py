@@ -13,7 +13,7 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav')
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Corte ajustado',time.time()-_t0))
-import whisperlib as WL;LIV=WL.liviano(W)   # perfil liviano (8 GB): modelo q5 + whisper-server cargado una vez; el potente (Mac) no cambia
+import whisperlib as WL;LIV=WL.liviano(W);WD=WL.words(W,A) if LIV else None   # perfil liviano (8 GB): modelo q5 + whisper-server cargado una vez; el potente (Mac) no cambia
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
 HOP=0.01;N=int(SR*HOP)
 def db(i):
@@ -63,6 +63,11 @@ for si,seg in enumerate(SEG):
         rs=regions(a,b,prev_b if prev_b is not None and prev_b<=a else 0);words=txt.split();prev_b=b
         if not rs: print('!! sin voz detectada en',a,b,txt);continue
         if len(rs)==1: out.append(dict(seg=si,a=round(rs[0][0],3),b=round(rs[0][1],3),t=txt));continue
+        if WD is not None:   # liviano: el guion se reparte por los tiempos de la pasada única (sin Whisper por región)
+            ts=WL.assign(WD,rs,txt)
+            if all(t and len(t.split())<=6*(r[1]-r[0])+1 for r,t in zip(rs,ts)):   # dudoso (región con voz y sin palabras, o más de ~6 palabras/s) → Whisper por región, como siempre
+                for r,t in zip(rs,ts): out.append(dict(seg=si,a=round(r[0],3),b=round(r[1],3),t=t))
+                continue
         hs=[heard(r[0],r[1],txt) for r in rs];cnt=[len(x.split()) for x in hs];tot=sum(cnt) or 1;k=0
         for j,r in enumerate(rs):
             n=len(words)-k if j==len(rs)-1 else min(len(words)-k,max(0,round(len(words)*cnt[j]/tot)))

@@ -48,18 +48,26 @@ def _get(path,timeout=2):
 def _ready():
     s=_get('/health')
     return s==200 or s==404   # 404 = versión sin /health: si responde, ya cargó el modelo (escucha después de cargarlo)
+_failed=False   # si el server no arrancó una vez, no reintentar en cada frase (cada intento recarga el modelo)
 def start(W=None,wait=180):
+    global _failed
     if _ready(): return True
+    if _failed: return False
+    _failed=True
     if not (os.path.exists(SERVER) or shutil.which(SERVER)): return False
     m=model(W);os.makedirs(CACHE,exist_ok=True);log=open(os.path.join(CACHE,'server.log'),'w')
     kw=dict(creationflags=0x00000008|0x00000200|0x08000000) if os.name=='nt' else dict(start_new_session=True)   # DETACHED | NEW_GROUP | NO_WINDOW
+    print('arrancando whisper-server…',file=sys.stderr)
     p=subprocess.Popen([SERVER,'-m',m,'-t',str(THREADS),'-l','es','--host','127.0.0.1','--port',str(PORT)],stdout=log,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL,**kw)
     json.dump(dict(pid=p.pid,port=PORT,model=m),open(STATE,'w'))
     t0=time.time()
     while time.time()-t0<wait:
-        if p.poll() is not None: return False
-        if _ready(): print(f'whisper-server listo ({os.path.basename(m)}, {THREADS} hilos, {time.time()-t0:.0f}s)',file=sys.stderr);return True
+        if p.poll() is not None: break
+        if _ready(): _failed=False;print(f'whisper-server listo ({os.path.basename(m)}, {THREADS} hilos, {time.time()-t0:.0f}s)',file=sys.stderr);return True
         time.sleep(0.5)
+    print('⚠️  whisper-server no arrancó (ver ~/.cache/whisper-cpp/server.log): sigo con whisper-cli',file=sys.stderr)
+    try: p.kill()
+    except Exception: pass
     return False
 def stop():
     try: st=json.load(open(STATE))
@@ -84,6 +92,52 @@ def text(wav,W=None,prompt=None):
         except Exception as e: print(f'⚠️  whisper-server falló ({e}); sigo con whisper-cli',file=sys.stderr)
     cmd=[WHISPER,'-m',model(W),'-f',wav,'-l','es','-np','-nt','-t',str(THREADS)]+(['--prompt',prompt] if prompt else [])
     return ' '.join(subprocess.run(cmd,capture_output=True,text=True,encoding='utf-8').stdout.split())
+
+# --- una pasada: todo el audio una vez con tiempos por palabra (en CPU cada pedido cuesta una ventana de 30 s aunque dure 0,2 s) ---
+def words(W,wav):
+    """Palabras [{t,a}] (a = arranque en segundos) de todo el wav, transcripto una sola vez. Se guarda en <W>/words_full.json mientras el wav no cambie."""
+    st=os.stat(wav);key=[st.st_size,int(st.st_mtime)];cache=os.path.join(W,'words_full.json')
+    try:
+        c=json.load(open(cache,encoding='utf-8'))
+        if c['key']==key: return c['words']
+    except Exception: pass
+    stop()   # no tener el server y whisper-cli con el modelo en RAM a la vez
+    base=os.path.join(W,'words_full_raw');js=base+'.json';t0=time.time()
+    if os.path.exists(js): os.unlink(js)
+    # DTW = tiempos por palabra precisos; con flash attention whisper.cpp lo ignora sin avisar (-nfa)
+    subprocess.run([WHISPER,'-m',model(W),'-f',wav,'-l','es','-np','-t',str(THREADS),'-ml','1','-sow','-ojf','-of',base,'-dtw','large.v3.turbo','-nfa'],capture_output=True)
+    if not os.path.exists(js): return None
+    out=[]
+    for x in json.load(open(js,encoding='utf-8')).get('transcription',[]):
+        tx=x['text'];tk=[t for t in x.get('tokens',[]) if not t['text'].startswith('[_')]
+        if not tx.strip() or tx.strip().startswith('[') or not tk: continue
+        on=next((t['t_dtw'] for t in tk if t.get('t_dtw',-1)>=0),x['offsets']['from']/10)/100   # inicio de la palabra (DTW, en centésimas)
+        if out and not tx.startswith(' ') and not tx[0] in '¿¡': out[-1]['t']+=tx;continue   # sub-palabra → pegar a la anterior
+        out.append(dict(t=tx.strip(),a=round(on,2)))
+    json.dump(dict(key=key,words=out),open(cache,'w',encoding='utf-8'),ensure_ascii=False)
+    print(f'transcripción de una pasada: {len(out)} palabras en {time.time()-t0:.0f}s',file=sys.stderr);return out
+def span(ws,a,b):
+    """Texto de las palabras que arrancan en [a, b] (DTW marca el arranque con ~0,1 s de margen)."""
+    return ' '.join(w['t'] for w in ws if a-0.12<=w['a']<=b+0.08)
+
+def assign(ws,rs,txt):
+    """Reparte el texto del guion (txt) entre las regiones de voz rs=[[a,b],...] de una frase: cada palabra del guion se empareja
+    con la que oyó Whisper y va a la región donde arranca esa palabra (en un silencio → la región siguiente); las que no se
+    emparejan siguen a su vecina. Devuelve el texto de cada región."""
+    import difflib,re,unicodedata
+    nm=lambda x:re.sub(r'[^a-z0-9ñ]','',unicodedata.normalize('NFD',x.lower().replace('ñ','\0')).encode('ascii','ignore').decode().replace('\0','ñ'))
+    heard=[w for w in ws if rs[0][0]-0.12<=w['a']<=rs[-1][1]+0.08];words=txt.split()
+    reg=lambda t:sum(t>=r[0] for r in rs[1:])
+    k=[None]*len(words)
+    for tag,i1,i2,j1,j2 in difflib.SequenceMatcher(None,[nm(x) for x in words],[nm(w['t']) for w in heard],autojunk=False).get_opcodes():
+        if tag=='equal' or (tag=='replace' and i2-i1==j2-j1):
+            for d in range(i2-i1): k[i1+d]=reg(heard[j1+d]['a'])
+    last=0
+    for i in range(len(k)):   # sin emparejar → la región de la anterior; y nunca hacia atrás
+        k[i]=max(last,k[i] if k[i] is not None else last);last=k[i]
+    out=[[] for _ in rs]
+    for w,r in zip(words,k): out[r].append(w)
+    return [' '.join(x) for x in out]
 
 if __name__=='__main__':
     c=sys.argv[1] if len(sys.argv)>1 else 'status'

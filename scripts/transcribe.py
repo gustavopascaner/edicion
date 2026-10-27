@@ -39,6 +39,7 @@ for a,b in big:
     prev=b
 if dur-prev>0.2: chunks.append((prev,dur))
 def tr(a,b,f,prompt=None):
+    if WD is not None: return WL.span(WD,a,b)
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.08)),'-to',str(b+0.08),'-i',A,f])
     if LIV: return WL.text(f,W,prompt)
     cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t',str(min(8,os.cpu_count() or 4)),'-np']
@@ -49,6 +50,7 @@ def tr(a,b,f,prompt=None):
         subprocess.run(cmd,capture_output=True)
         if os.path.exists(o): return open(o,encoding='utf-8').read().strip().replace('\n',' ')
     print(f'⚠️  sin transcripción para {os.path.basename(f)}',file=sys.stderr);return ''
+WD=WL.words(W,A) if LIV else None   # liviano: todo el audio de una pasada (en CPU cada pedacito cuesta 30 s de cómputo)
 res=[]
 for ci,(a,b) in enumerate(chunks):
     full=tr(a,b,os.path.join(W,'sub',f'c{ci:02d}.wav'))

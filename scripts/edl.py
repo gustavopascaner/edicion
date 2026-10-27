@@ -32,6 +32,7 @@ for ci,p in enumerate(P):
     post=POST_END if end else POST
     a=p['a']-PRE;b=p['b']+post+(TAIL if ci==len(P)-1 else 0)
     iv.append([max(0,math.floor(a*FPS+1e-6)),min(NFR,math.ceil(b*FPS-1e-6))])
+if cfg.get('start_zero') and iv: iv[0][0]=0   # gancho visual: el video arranca en el segundo 0 del master (silencio inicial a propósito); los subtítulos siguen a la voz
 # 2 · si la voz sigue sonando en el punto de corte, correr el corte hasta donde ya hay silencio (sin invadir al vecino)
 snap=0
 for i,v in enumerate(iv):

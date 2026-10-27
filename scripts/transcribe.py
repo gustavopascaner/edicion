@@ -13,6 +13,7 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 src,W=sys.argv[1],sys.argv[2];os.makedirs(os.path.join(W,'sub'),exist_ok=True)
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Transcripción',time.time()-_t0))
+import whisperlib as WL;LIV=WL.liviano(W)   # perfil liviano (8 GB): modelo q5 + whisper-server cargado una vez; el potente (Mac) no cambia
 A=os.path.join(W,'audio16k.wav')
 if not os.path.exists(A):
     subprocess.run(['ffmpeg','-v','error','-y','-i',src,'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',A],check=True)
@@ -39,6 +40,7 @@ for a,b in big:
 if dur-prev>0.2: chunks.append((prev,dur))
 def tr(a,b,f,prompt=None):
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.08)),'-to',str(b+0.08),'-i',A,f])
+    if LIV: return WL.text(f,W,prompt)
     cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t',str(min(8,os.cpu_count() or 4)),'-np']
     if prompt: cmd+=['--prompt',prompt]
     o=f[:-4]+'.txt'

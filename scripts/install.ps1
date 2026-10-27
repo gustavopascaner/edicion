@@ -2,7 +2,7 @@
 # uso (PowerShell, desde la carpeta clonada del repo):
 #   powershell -ExecutionPolicy Bypass -File scripts\install.ps1 [ruta\a\edicion-sfx.zip]
 # Instala con winget lo que falte: Git, Python 3, Node LTS, FFmpeg y Google Chrome; whisper.cpp (binario oficial)
-# y el modelo de Whisper; las dependencias de Node; los efectos de sonido; y enlaza la skill en ~/.codex y ~/.claude.
+# y los modelos de Whisper (completo + q5 para el perfil liviano); las dependencias de Node; los efectos de sonido; y enlaza la skill en ~/.codex y ~/.claude.
 param([string]$SfxZip = "")
 $ErrorActionPreference = "Stop"
 $SK = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -60,6 +60,15 @@ else {
   curl.exe -L --fail -o $M "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
   Ok "Modelo de Whisper"
 }
+# 3b · Modelo cuantizado (~550 MB) para el perfil liviano (8 GB): 2-3x más rápido en CPU y ~1 GB menos de RAM
+$Q = Join-Path $HOME ".cache\whisper-cpp\ggml-large-v3-turbo-q5_0.bin"
+if ((Test-Path $Q) -and ((Get-Item $Q).Length -gt 400MB)) { Ok "Modelo liviano de Whisper ya descargado" }
+else {
+  Info "Descargando el modelo liviano de Whisper (~550 MB)..."
+  curl.exe -L --fail -o $Q "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
+  Ok "Modelo liviano de Whisper"
+}
+if (-not (Test-Path (Join-Path $WD "whisper-server.exe"))) { Warn "Falta whisper-server.exe en $WD (se usa whisper-cli, más lento): borrá esa carpeta y volvé a correr este script" }
 
 # 4 · Dependencias de Node del motor de gráficos
 Info "Instalando dependencias de Node..."

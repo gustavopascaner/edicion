@@ -10,6 +10,7 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav');T=os.path.join(W,'t.wav')
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Verificación de audio',time.time()-_t0))
+import whisperlib as WL;LIV=WL.liviano(W)   # perfil liviano (8 GB): modelo q5 + whisper-server cargado una vez; el potente (Mac) no cambia
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
 def env(a,b,st=0.1):
     out=[];t=a
@@ -19,5 +20,5 @@ def env(a,b,st=0.1):
 for r in sys.argv[2:]:
     a,b=map(float,r.split('-'))
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(a),'-to',str(b),'-i',A,T])
-    t=subprocess.run([WHISPER,'-m',MODEL,'-f',T,'-l','es','-np','-nt'],capture_output=True,text=True).stdout.strip().replace('\n',' ')
+    t=WL.text(T,W) if LIV else subprocess.run([WHISPER,'-m',MODEL,'-f',T,'-l','es','-np','-nt'],capture_output=True,text=True).stdout.strip().replace('\n',' ')
     print(f'{a}-{b}: «{t}»\n   {env(a,b)}')

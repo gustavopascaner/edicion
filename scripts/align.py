@@ -12,6 +12,8 @@ import json,os,re,sys,subprocess,unicodedata,difflib
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];E=json.load(open(os.path.join(W,'edl.json')));FPS=E['fps'];cut=os.path.join(W,'cut.wav')
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import whisperlib as WL
+if WL.liviano(W): WL.stop();MODEL=WL.model(W)   # liviano: modelo q5 y sin el server en RAM (este paso usa whisper-cli por los tiempos por palabra)
 norm=lambda s:re.sub(r'[^a-z0-9ñ]','',unicodedata.normalize('NFD',s.lower()).replace('ñ','\0').encode('ascii','ignore').decode().replace('\0','ñ'))
 # 1 · Whisper con una palabra por segmento
 base=os.path.join(W,'cut_words');js=base+'.json'

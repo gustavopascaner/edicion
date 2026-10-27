@@ -13,6 +13,7 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];A=os.path.join(W,'audio16k.wav')
 import atexit,time;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import timing;_t0=time.time();atexit.register(lambda:timing.log(W,'Corte ajustado',time.time()-_t0))
+import whisperlib as WL;LIV=WL.liviano(W)   # perfil liviano (8 GB): modelo q5 + whisper-server cargado una vez; el potente (Mac) no cambia
 w=wave.open(A);SR=w.getframerate();raw=w.readframes(w.getnframes());S=struct.unpack('<%dh'%(len(raw)//2),raw)
 HOP=0.01;N=int(SR*HOP)
 def db(i):
@@ -54,6 +55,7 @@ def regions(a,b,lo=0):
     return merged
 def heard(a,b,prompt):
     f=os.path.join(W,'t.wav');subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.05)),'-to',str(b+0.05),'-i',A,f])
+    if LIV: return WL.text(f,W)
     return subprocess.run([WHISPER,'-m',MODEL,'-f',f,'-l','es','-np','-nt'],capture_output=True,text=True).stdout.strip().replace('\n',' ')   # sin prompt: el texto esperado haría que Whisper "complete" lo que no se dijo
 out=[];prev_b=None
 for si,seg in enumerate(SEG):

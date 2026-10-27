@@ -5,7 +5,7 @@ uso: python3 -I doctor.py      (Windows: py -3 -X utf8 -I doctor.py)
 import os as _o,sys as _s,subprocess as _sp
 if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
 import os,shutil,subprocess,sys,glob
-SK=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'));WIN=os.name=='nt'
+SK=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'));WIN=os.name=='nt';sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or shutil.which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 FIX_MAC={'python':'xcode-select --install','ffmpeg':'brew install ffmpeg','whisper':'brew install whisper-cpp','node':'brew install node','chrome':'brew install --cask google-chrome',
@@ -32,6 +32,10 @@ v=ver(['ffmpeg','-version']);row(bool(v),'ffmpeg',v[:40] if v else 'no encontrad
 v=ver(['ffprobe','-version']);row(bool(v),'ffprobe',v[:40] if v else 'no encontrado','ffmpeg')
 w=WHISPER if os.path.exists(WHISPER or '') or shutil.which(WHISPER or '') else None;row(bool(w),'whisper-cli',w or 'no encontrado','whisper')
 row(os.path.exists(MODEL) and os.path.getsize(MODEL)>1e9,'Modelo de Whisper',MODEL if os.path.exists(MODEL) else 'no descargado','model')
+import whisperlib as WL
+if WL.liviano():   # perfil liviano (8 GB): modelo q5 + whisper-server; si faltan funciona igual, pero más lento
+    q=os.path.exists(WL.MODEL_Q5);rows.append(f"{'✓' if q else '·'} {'Modelo liviano (q5)':24s} {WL.MODEL_Q5 if q else 'no descargado: se usa el completo, más lento  →  '+FIX['model']}")
+    s=bool(os.path.exists(WL.SERVER) or shutil.which(WL.SERVER));rows.append(f"{'✓' if s else '·'} {'whisper-server':24s} {WL.SERVER if s else 'no encontrado: se usa whisper-cli, más lento  →  '+FIX['whisper']}")
 v=ver(['node','--version']);ok=bool(v) and int(v.lstrip('v').split('.')[0])>=18;row(ok,'Node 18+',v or 'no encontrado','node')
 row(os.path.isdir(os.path.join(SK,'engine','node_modules','puppeteer-core')),'Dependencias de Node','engine/node_modules' if os.path.isdir(os.path.join(SK,'engine','node_modules','puppeteer-core')) else 'faltan','deps')
 c=chrome();row(bool(c),'Google Chrome',c or 'no encontrado','chrome')

@@ -18,6 +18,21 @@ SERVER=os.environ.get('WHISPER_SERVER') or shutil.which('whisper-server') or os.
 PORT=int(os.environ.get('EDICION_WHISPER_PORT','8178'));URL=f'http://127.0.0.1:{PORT}'
 STATE=os.path.join(CACHE,'server.json')
 THREADS=min(8,os.cpu_count() or 4)
+# PRUEBA · Whisper remoto (OpenAI vía n8n): solo si está configurado, y solo en el perfil liviano (los scripts del potente no pasan por acá).
+# ~/.config/edicion/whisper_remoto.json {"url": "...", "token": "..."} o EDICION_WHISPER_REMOTO / EDICION_WHISPER_TOKEN. Si falla, sigue con Whisper local.
+def _remote_cfg():
+    c={}
+    try: c=json.load(open(os.path.expanduser('~/.config/edicion/whisper_remoto.json'),encoding='utf-8'))
+    except Exception: pass
+    url=os.environ.get('EDICION_WHISPER_REMOTO') or c.get('url');tok=os.environ.get('EDICION_WHISPER_TOKEN') or c.get('token')
+    return (url,tok,c.get('model')) if url and tok else None
+REMOTE=_remote_cfg()
+def _remote(wav,prompt=None,words=False):
+    import urllib.parse
+    if os.path.getsize(wav)>24*2**20: raise RuntimeError('audio > 24 MB (límite de OpenAI)')
+    url,tok,mdl=REMOTE;q={k:v for k,v in (('words','1' if words else ''),('prompt',(prompt or '')[:600]),('model',mdl or '')) if v}
+    req=urllib.request.Request(url+('?'+urllib.parse.urlencode(q) if q else ''),data=open(wav,'rb').read(),headers={'Content-Type':'audio/wav','x-edicion-token':tok})
+    with urllib.request.urlopen(req,timeout=300) as r: return json.loads(r.read().decode('utf-8'))
 
 def ram_gb():
     try:
@@ -86,7 +101,10 @@ def _post(wav,prompt):
     req=urllib.request.Request(URL+'/inference',data=b''.join(parts),headers={'Content-Type':f'multipart/form-data; boundary={b}'})
     with urllib.request.urlopen(req,timeout=600) as r: return r.read().decode('utf-8')
 def text(wav,W=None,prompt=None):
-    """Texto de un wav corto (sin tiempos). Usa el server; si falla, whisper-cli con el mismo modelo y todos los hilos."""
+    """Texto de un wav corto (sin tiempos). Remoto si está configurado; si no, el server; si falla, whisper-cli con el mismo modelo y todos los hilos."""
+    if REMOTE:
+        try: return ' '.join((_remote(wav,prompt).get('text') or '').split())
+        except Exception as e: print(f'⚠️  Whisper remoto falló ({e}); sigo con el local',file=sys.stderr)
     if start(W):
         try: return ' '.join(_post(wav,prompt).split())
         except Exception as e: print(f'⚠️  whisper-server falló ({e}); sigo con whisper-cli',file=sys.stderr)
@@ -101,6 +119,16 @@ def words(W,wav):
         c=json.load(open(cache,encoding='utf-8'))
         if c['key']==key: return c['words']
     except Exception: pass
+    if REMOTE:
+        try:
+            t0=time.time();r=_remote(wav,words=True);ws=r.get('words') or []
+            tx=(r.get('text') or '').split()   # las palabras vienen sin puntuación: si coinciden en cantidad, usar las del texto (con comas y puntos)
+            # OpenAI pega el arranque de cada palabra al final de la anterior (se come el silencio): el arranque real sale del final
+            out=[dict(t=tx[i] if len(tx)==len(ws) else w['word'],a=round(max(w['start'],w['end']-0.2),2)) for i,w in enumerate(ws)]
+            if out:
+                json.dump(dict(key=key,words=out,src='remoto'),open(cache,'w',encoding='utf-8'),ensure_ascii=False)
+                print(f'transcripción de una pasada (remota): {len(out)} palabras en {time.time()-t0:.0f}s',file=sys.stderr);return out
+        except Exception as e: print(f'⚠️  Whisper remoto falló ({e}); sigo con el local',file=sys.stderr)
     stop()   # no tener el server y whisper-cli con el modelo en RAM a la vez
     base=os.path.join(W,'words_full_raw');js=base+'.json';t0=time.time()
     if os.path.exists(js): os.unlink(js)
@@ -143,4 +171,4 @@ if __name__=='__main__':
     c=sys.argv[1] if len(sys.argv)>1 else 'status'
     if c=='start': ok=start();print('whisper-server corriendo ✓' if ok else '✗ no arrancó (ver ~/.cache/whisper-cpp/server.log): se usa whisper-cli');sys.exit(0 if ok else 1)
     elif c=='stop': print('whisper-server detenido ✓' if stop() else 'whisper-server no estaba corriendo')
-    else: print(f"perfil {perfil()} ({ram_gb():.0f} GB) · modelo {os.path.basename(model())} · server {'corriendo' if _ready() else 'detenido'} en {URL}")
+    else: print(f"perfil {perfil()} ({ram_gb():.0f} GB) · modelo {os.path.basename(model())} · server {'corriendo' if _ready() else 'detenido'} en {URL} · remoto {'configurado: '+REMOTE[0] if REMOTE else 'no'}")

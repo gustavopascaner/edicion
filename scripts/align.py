@@ -13,17 +13,18 @@ MODEL=os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin')
 WHISPER=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
 W=sys.argv[1];E=json.load(open(os.path.join(W,'edl.json')));FPS=E['fps'];cut=os.path.join(W,'cut.wav')
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));import whisperlib as WL
-if WL.liviano(W): WL.stop();MODEL=WL.model(W)   # liviano: modelo q5 y sin el server en RAM (este paso usa whisper-cli por los tiempos por palabra)
+LIV=WL.liviano(W)   # liviano: Whisper remoto (tiempos por palabra de OpenAI), nada local
 norm=lambda s:re.sub(r'[^a-z0-9ñ]','',unicodedata.normalize('NFD',s.lower()).replace('ñ','\0').encode('ascii','ignore').decode().replace('\0','ñ'))
 # 1 · Whisper con una palabra por segmento
-base=os.path.join(W,'cut_words');js=base+'.json'
-for dtw in (['-dtw','large.v3.turbo'],[]):
+base=os.path.join(W,'cut_words');js=base+'.json';asr=[]
+# remoto: whisper-1 marca cada palabra ~0,25 s tarde en promedio frente al DTW local (medido en un corte de 48 s; error típico ±4 frames) → se adelanta 0,2 s
+if LIV: asr=[dict(t=x['t'],n=norm(x['t']),frm=round(max(0,x['a']-0.2)*1000),to=round(x['b']*1000)) for x in WL.remote_words(cut) if norm(x['t'])]
+for dtw in ([] if LIV else (['-dtw','large.v3.turbo'],[])):
     if os.path.exists(js): os.unlink(js)
     subprocess.run([WHISPER,'-m',MODEL,'-f',cut,'-l','es','-np','-t',str(min(8,os.cpu_count() or 4)),'-ml','1','-sow','-ojf','-of',base]+dtw,capture_output=True)
     if os.path.exists(js): break
-if not os.path.exists(js): sys.exit('✗ Whisper no generó tiempos por palabra: no se pudo verificar el corte')
-asr=[]
-for s in json.load(open(js)).get('transcription',[]):
+if not LIV and not os.path.exists(js): sys.exit('✗ Whisper no generó tiempos por palabra: no se pudo verificar el corte')
+for s in ([] if LIV else json.load(open(js)).get('transcription',[])):
     tx=s['text'];o=s['offsets']
     if not norm(tx): continue
     if asr and not tx.startswith(' ') and not re.match(r'^[¿¡]',tx): asr[-1]['to']=o['to'];asr[-1]['t']+=tx;asr[-1]['n']=norm(asr[-1]['t']);continue   # sub-palabra → pegar a la anterior

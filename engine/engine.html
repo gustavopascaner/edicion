@@ -55,6 +55,12 @@ function rise(el,t,a,d=.55,ez=E.expo){const x=ez(P(t,a,d)),q=P(t,a,d);
 function split(el){const txt=el.textContent;el.innerHTML='';return [...txt].map(c=>h('span','',el,c===' '?'&nbsp;':c,'ch'))}
 function svg(html,css,parent){const d=h('div',css,parent);d.innerHTML=html;return d}
 let DUR=1,FRAME=0;
+// Entrada de la pantalla completa (p.enter): null = barrido desde abajo (el de siempre) · {kind:'iris', cx, cy} = círculo que crece
+// desde un punto (match cut: el punto donde estaba el MG o la ilustración anterior). La salida es siempre hacia arriba.
+let ENTER=null;
+// Tarjetas "vivas" (p.alive, o arte.json "vivo"): una vez armadas flotan apenas (nada queda congelado mientras se habla)
+let ALIVE=false;
+const alive=(el,t,o)=>{if(ALIVE&&o<=0&&t>.6)el.style.transform+=` translateY(${Math.sin(t*1.6)*5}px) rotate(${Math.sin(t*1.1+1)*.35}deg)`;};
 // ---------- wrappers ----------
 // Fullscreen: layered wipe in from bottom, wipe out to top
 function FS(bg,accent){
@@ -62,12 +68,17 @@ function FS(bg,accent){
  const m=h('div',`position:absolute;inset:0;background:${bg};overflow:hidden`);
  const g=h('div','',m,null,'grain');
  const c=h('div','position:absolute;inset:0',m);
+ const en=ENTER&&ENTER.kind==='iris'?ENTER:null;
  const upd=t=>{const tin=E.expo(P(t,0,.42)),tin2=E.expo(P(t,.07,.45));
   const to=E.io(P(t,DUR-.36,.34)),to2=E.io(P(t,DUR-.30,.30));
-  a.style.clipPath=`inset(${(1-tin)*100}% 0 ${to*100}% 0)`;
-  m.style.clipPath=`inset(${(1-tin2)*100}% 0 ${to2*100}% 0)`;
-  g.style.transform=`translate(${(FRAME*37)%200-100}px,${(FRAME*53)%200-100}px)`;
-  c.style.transform=`translateY(${(1-tin2)*120-to2*80}px)`;};
+  if(en){const cx=en.cx??540,cy=en.cy??960,Rm=Math.hypot(Math.max(cx,1080-cx),Math.max(cy,1920-cy))*1.02;
+   a.style.clipPath=to>0?`inset(0 0 ${to*100}% 0)`:`circle(${tin*Rm}px at ${cx}px ${cy}px)`;
+   m.style.clipPath=to2>0?`inset(0 0 ${to2*100}% 0)`:`circle(${tin2*Rm}px at ${cx}px ${cy}px)`;
+   c.style.transform=`scale(${L(.92,1,tin2)}) translateY(${-to2*80}px)`;}
+  else{a.style.clipPath=`inset(${(1-tin)*100}% 0 ${to*100}% 0)`;
+   m.style.clipPath=`inset(${(1-tin2)*100}% 0 ${to2*100}% 0)`;
+   c.style.transform=`translateY(${(1-tin2)*120-to2*80}px)`;}
+  g.style.transform=`translate(${(FRAME*37)%200-100}px,${(FRAME*53)%200-100}px)`;};
  return {c,m,upd};
 }
 // Overlay card: pop in, shrink out
@@ -78,7 +89,7 @@ function OV(el,ox=.5,oy=.5){el.style.transformOrigin=`${ox*100}% ${oy*100}%`;
   else if(MOT==='mask'||MOT==='type'){el.style.clipPath=`inset(0 0 ${(1-x)*100}% 0 round 36px)`;el.style.transform=`translateY(${-o*30}px) scale(${L(1,.9,o)})`;}
   else if(MOT==='pop')el.style.transform=`scale(${L(.4,1,E.el(P(t,0,.8)))*L(1,.9,o)}) rotate(${(1-i)*-4}deg)`;
   else el.style.transform=`translateY(${(1-i)*60-o*30}px) scale(${L(.86,1,i)*L(1,.9,o)}) rotate(${(1-i)*-2}deg)`;
-  el.style.opacity=Math.min(P(t,0,.12),1-o);}}
+  alive(el,t,o);el.style.opacity=Math.min(P(t,0,.12),1-o);}}
 function kick(parent,txt,color){const k=h('div','',parent,`<span class="dot" style="background:${color||'var(--hot)'}"></span>${txt}`,'kick');return k}
 function popIn(el,t,a,d=.45){const x=E.back(P(t,a,d));el.style.opacity=P(t,a,.1);el.style.transform=`translateY(${(1-x)*40}px) scale(${L(.8,1,x)})`;}
 function grow(el,t,a,d=.35){el.style.transform=`scaleX(${E.o3(P(t,a,d))})`;}
@@ -857,6 +868,27 @@ SC.concept=p=>{const [bg,fg,hl,hl2]=CTH[p.bg||'paper'],f=FS(bg,p.bg==='hot'?'var
  if(!m)throw new Error(p.motif?'motivo viejo desconocido: '+p.motif:'falta <work>/concept.js con window.CONCEPT (la animación conceptual de este video, escrita desde cero)');
  const a=p.at??Math.min(DUR*.5,1.8);const u=m(g,p,a,DUR,rnd(p.seed||7));
  return t=>{f.upd(t);u(t);};};
+// ───────── ILU: ilustración superpuesta (pista ov), dibujada desde cero para este video en <work>/ilustra.js ─────────
+// window.ILU={ <fig>:(g,p,a,D,r)=>{ …dibujar en g (svg 1000×1000, todo visible)… return t=>{…} } } — el mismo contrato que
+// CONCEPT, pero SOBRE EL VIDEO (fondo transparente), al lado de la cara (avoidFace la ubica) y con sombra para leerse sobre la cámara.
+// Sin texto, salvo p.label (rótulo corto). Las figuras que se repiten (el objeto héroe) van en window.FIG y las usan ILU y CONCEPT.
+// p:{fig, at, w?, h?, x?, y?, tone:'paper'|'ink', plate?:true|'paper'|'ink'|'hot', label?, labelTop?, seed?, alive?}
+//   tone 'paper' (default): figura clara + sombra, para video normal · 'ink': figura oscura, para video muy claro · plate: placa de color detrás (sin texto)
+SC.ilu=p=>{const m=(window.ILU||{})[p.fig];
+ if(!m)throw new Error(p.fig?`figura "${p.fig}" no está en <work>/ilustra.js (window.ILU)`:'ilu sin "fig": nombre de la figura en <work>/ilustra.js');
+ const w=p.w||620,hh=p.h||w,x=p.x??540-w/2,y=p.y??300;
+ const wrap=h('div',`position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${hh}px`);
+ const setc=(fg,hl,hl2)=>{wrap.style.setProperty('--fg',fg);wrap.style.setProperty('--hl',hl);wrap.style.setProperty('--hl2',hl2);};
+ setc(p.tone==='ink'?'var(--ink)':'var(--paper)','var(--hot)',p.tone==='ink'?'var(--hot)':'var(--lime)');
+ let plate=null;if(p.plate){const pb=p.plate===true?'paper':p.plate;
+  plate=h('div',`position:absolute;inset:-6%;border-radius:48px;overflow:hidden;background:var(--${pb});box-shadow:0 30px 80px rgba(0,0,0,.35)`,wrap);h('div','',plate,null,'grain');
+  if(pb==='hot')setc('var(--ink)','var(--ink)','var(--lime)');else if(pb==='ink')setc('var(--paper)','var(--hot)','var(--lime)');else setc('var(--ink)','var(--hot)','var(--hot)');
+  wrap.style.setProperty('--bgc',`var(--${pb})`);}
+ const g=sv('svg',{viewBox:'0 0 1000 1000',width:w,height:hh},wrap,`position:absolute;inset:0;overflow:visible;display:block;${plate?'':'filter:drop-shadow(0 14px 34px rgba(0,0,0,.38))'}`);
+ let lab=null;if(p.label)lab=h('div',`position:absolute;left:50%;top:${p.labelTop??'100%'};translate:-50% 10px;white-space:nowrap`,wrap,
+  `<span style="display:inline-flex;align-items:center;gap:12px;background:var(--hot);color:var(--ink);padding:12px 20px;border-radius:10px;font-size:26px" class="mono"><span class="dot" style="background:var(--ink)"></span>${p.label}</span>`);
+ const a=p.at??Math.min(DUR*.5,1.8),u=m(g,p,a,DUR,rnd(p.seed||7)),ov=OV(wrap,.5,.5);
+ return t=>{ov(t);u(t);if(lab)popIn(lab,t,.3);};};
 // ---------- save (CTA "guardá este video") ----------
 SC.save=p=>{
  const card=h('div','top:'+(p.y||330)+'px',S,null,'card');
@@ -932,7 +964,8 @@ SC.listCard=listCard;
 let UPD=null;
 // No pisar la cara: window.SAFE={face:[x0,y0,x1,y1],zones:[[y0,y1],…]} (layout.js). Si el gráfico armado (al final) se cruza con la cara,
 // se mueve entero a la zona libre donde entre más grande (y se achica si hace falta). Devuelve qué hizo, para el plan.
-function contentBox(){let r=null;for(const e of S.querySelectorAll('*')){const b=e.getBoundingClientRect();if(b.width<2||b.height<2||(b.width>=1000&&b.height>=1700))continue;
+function contentBox(){let r=null;for(const e of S.querySelectorAll('*')){if(e.classList&&e.classList.contains('grain'))continue;   // el grano desborda a propósito (inset -200px): no es contenido
+  const b=e.getBoundingClientRect();if(b.width<2||b.height<2||(b.width>=1000&&b.height>=1700))continue;
   if(getComputedStyle(e).opacity==='0')continue;r=r?{left:Math.min(r.left,b.left),top:Math.min(r.top,b.top),right:Math.max(r.right,b.right),bottom:Math.max(r.bottom,b.bottom)}:{left:b.left,top:b.top,right:b.right,bottom:b.bottom};}
  if(r){r.width=r.right-r.left;r.height=r.bottom-r.top;}return r;}
 function avoidFace(){const SF=window.SAFE;if(!SF||!SF.face)return null;const r=contentBox();if(!r)return null;const [fx0,fy0,fx1,fy1]=SF.face;
@@ -949,7 +982,7 @@ function unhyph(v){if(typeof v==='string')return v.replace(/­|&shy;/g,'');
    if(typeof x==='string'&&typeof pr==='string'&&/\p{L}[-‐‑]\s*$/u.test(_txt(pr))&&/^\s*\p{L}/u.test(_txt(x)))o[o.length-1]=pr.replace(/[-‐‑](\s*(?:<\/[^>]+>\s*)*)$/,'$1')+x.replace(/^\s+/,'');
    else o.push(x);}return o;}
  if(v&&typeof v==='object'){for(const k in v)v[k]=unhyph(v[k]);}return v;}
-window.setup=(name,p,dur)=>{p=unhyph(p);S.innerHTML='';S.style.transform='';S.style.opacity='';window._ready=null;DUR=dur;MOT=p.motion||null;UPD=SC[name](p);
+window.setup=(name,p,dur)=>{p=unhyph(p);S.innerHTML='';S.style.transform='';S.style.opacity='';window._ready=null;DUR=dur;MOT=p.motion||null;ENTER=p.enter||null;ALIVE=!!p.alive;UPD=SC[name](p);
  const go=()=>{if(!p._place)return null;FRAME=0;UPD(Math.max(0,dur-.4));return avoidFace();};
  return window._ready&&window._ready.length?Promise.all(window._ready).then(go):go();};   // escenas con fotos: esperar a que decodifiquen
 window.frame=(t,f)=>{FRAME=f;UPD(t);};

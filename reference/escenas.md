@@ -5,6 +5,7 @@ Tipografías: Bricolage Grotesque condensada (títulos, mayúsculas), Inter Tigh
 Zonas: gráficos arriba (y 200–1100), subtítulos en y≈1230. Los tiempos `*At` son **segundos locales** de la escena; usar `R(s, W(seg,'palabra'))`.
 Pistas: `ov` = superpuesto · `ov2` = superpuesto por encima de otro ov (ej. tarjeta sobre el tracker) · `fs` = pantalla completa (tapa la cara; usar 1–3 s).
 Helper `H('texto')` = resaltado naranja dentro de líneas `disp`.
+Params comunes a todas las escenas: `skin`, `motion` (ver abajo), `alive:true` (la tarjeta flota apenas una vez armada; arte.json `"vivo": true` lo pone en todas las ov), `free:true` (no moverla por la cara), `heroe:true` (marca que ahí aparece el objeto héroe, para el director). Las **fs** además: `enter:{kind:'iris', cx, cy}` = entra como un círculo que crece desde ese punto (match cut con la ilustración o tarjeta anterior) en vez del barrido desde abajo.
 
 ## Tarjetas superpuestas (ov)
 | escena | params | uso |
@@ -25,6 +26,7 @@ Helper `H('texto')` = resaltado naranja dentro de líneas `disp`.
 | `name` | `numAt` | GUS PASCANER + contador "+300 profesionales" |
 | `hook` | `tags:[2], tagAt:[2], bigAt` | "MARKETING DESDE CERO" (texto fijo, adaptar si se reusa) |
 | `stat` | `kick, to (ej 99.9), countEnd, l1` | número gigante que cuenta |
+| `ilu` | `fig, at, w?, h?, x?, y?, tone:'paper'\|'ink', plate?:true\|'paper'\|'hot'\|'ink', label?, seed?` — **sin texto** (solo `label`), dibujada en `<work>/ilustra.js` | **ilustración de la idea** al lado de la cara: el héroe que respira y cambia en `at`, una metáfora (ver abajo y `recetas.md`) |
 | `sticker` | `kick, text, size?, x?, y?, bg?, aw (1 = sin flecha), ax, ay, skin?` — skins `tape` `bubble` (`tail:'right'`) | etiqueta inclinada con flecha dibujada; ideal sobre b-roll |
 | `stamp` | `kick?, text, at, y?, rot?, color?, size?, skin?` — skin `round` (`ring`, `d`) | sello que cae y tiembla ("NO LITERAL") |
 | `hud` | `tag, kick, text, labAt, flash?` | HUD de rayos X/cámara sobre b-roll (esquinas, REC, scan, texto tipeado) |
@@ -104,6 +106,20 @@ Los marcos cortan con el b-roll (sin salida animada) y no cuentan como MG. Encim
 | `collage` | recortes de papel, sombras duras, semitono, grano | `cutout(el,rot)` · `pat(g,'dots'|'lines'|'cross',col)` → `fill:url(#…)` · param `grain:'heavy'` |
 | `datos` | diagrama: ejes, puntos, barras con intención (no la "barra que sube") | `sv('line'…)`, `particles()`, `along()` |
 | `plana` | la vieja: línea plana centrada (ya usada en todos los videos anteriores: evitar) | — |
+
+## Ilustraciones superpuestas (`ilu`): dibujadas para cada video
+Idea traída de la skill motion (modo libre): **mostrar, no escribir**. Una `ilu` es una figura animada **sobre el video**, al lado de la cara (la ubica `avoidFace`), sin texto, que cuenta la idea de ese tramo como imagen: el héroe del video que respira y en `at` cambia (se parte, se llena, se tacha, viaja). Va en la pista `ov` y cuenta como MG superpuesto. Recetas y principios en `reference/recetas.md`; ejemplo de sintaxis en `reference/ejemplo_ilustra.js` (**no copiar las figuras**).
+```js
+// <work>/ilustra.js — render.js lo carga antes de concept.js (window.FIG también sirve en window.CONCEPT)
+window.FIG=window.FIG||{};window.ILU=window.ILU||{};
+FIG.heroe=(g,x,y,s,o)=>{ /* la figura compartida, con parámetros de pose; devuelve sus grupos */ };
+ILU.heroe_cambia=(g,p,a,D,r)=>{ /* dibujar con sv() en g (1000×1000, todo visible) */ return t=>{ /* respirar; cambiar en a */ }; };
+```
+- Job: `J('03_idea','ilu','ov',s,e,{fig:'heroe_cambia',at:R(s,W(2,'palabra')),w:560,label:'rótulo corto'})`. Tamaño `w`/`h` (default 620), posición `x`/`y` (default centrada arriba; si pisa la cara se mueve sola).
+- **Colores**: `FG` (figura), `HL`, `HL2`, `SUB`. `tone:'paper'` (default) = figura clara con sombra, para video normal; `tone:'ink'` = figura oscura, para video muy claro. `plate:'paper'|'hot'|'ink'` pone una placa de color detrás (sin texto) y recalcula los colores; los de la marca se heredan solos.
+- La **entrada y la salida** las hace el motor (OV: pop y encogido en los últimos 0,3 s, según `motion`); la figura solo vive y cambia. SFX automático: `pop` al entrar y su momento `at` cuenta como acierto.
+- El **héroe** (`arte.json "heroe"`) tiene que volver ≥ 2 veces: `ilu` con `fig` igual al nombre del héroe, y/o `heroe:true` en el `concept`/CTA que lo dibuja con `FIG`.
+- Checklist: se entiende sin texto en 2 s · una sola idea · respira o se mueve todo el tiempo · el cambio cae en la palabra (`at`) · probar con `--test --only='ilu' --t=0.4,<at>,<at+0.6>,end-0.4` y mirar los PNG sobre el cuadro (`sheets.py`).
 
 ## Agregar una escena nueva
 Escribir `SC.nombre=p=>{ ...construir DOM con h(), ml(), kick()...; return t=>{ ...animar según t... } }` en engine.html antes de `SC.listCard=listCard;`.

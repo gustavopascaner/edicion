@@ -22,7 +22,9 @@ function huella(WD){const rj=f=>JSON.parse(fs.readFileSync(path.join(WD,f))),ex=
   return {video:cfg.name,fecha:new Date().toISOString().slice(0,10),marca:cfg.brand?path.basename(String(cfg.brand)):'editorial',arquetipo:art.arquetipo||cfg.arquetipo||'',firma:art.firma||'',
     seq:mg.map(j=>j.scene+':'+j.track),fs:mg.filter(j=>j.track==='fs').map(j=>BGN(j.p.bg)),skins:[...new Set(mg.map(j=>j.scene+'.'+(j.p.skin||'default')))],
     motion:[...new Set(mg.map(j=>j.p.motion||art.motion||'mask'))],subs:(typeof cs==='string'?cs:cs&&cs.style)||'box',broll:broll.map(b=>b.fx||'full'),
-    encuadres:fr.map(f=>f.mode).join(' '),gramatica:cc?(hdr(cj,'GRAM[AÁ]TICA')?gramKey(hdr(cj,'GRAM[AÁ]TICA')):'plana'):'',concept_bg:cc?BGN(cc.p.bg):''};}
+    encuadres:fr.map(f=>f.mode).join(' '),gramatica:cc?(hdr(cj,'GRAM[AÁ]TICA')?gramKey(hdr(cj,'GRAM[AÁ]TICA')):'plana'):'',concept_bg:cc?BGN(cc.p.bg):'',
+    // tratamiento (SKILL.md 4-pre): objeto héroe, metáforas visuales e ilustraciones superpuestas de este video
+    heroe:art.heroe||'',metaforas:art.metaforas||[],ilu:mg.filter(j=>j.scene==='ilu').map(j=>j.p.fig||'')};}
 const lcs=(a,b)=>{const d=Array(b.length+1).fill(0);for(const x of a){let pv=0;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=x===b[j-1]?pv+1:Math.max(d[j],d[j-1]);pv=t;}}return d[b.length];};
 const seqS=(a,b)=>a.length||b.length?lcs(a,b)/Math.max(a.length,b.length):1;
 const jac=(a,b)=>{const A=new Set(a),B=new Set(b);if(!A.size&&!B.size)return 1;let i=0;A.forEach(x=>B.has(x)&&i++);return i/(A.size+B.size-i);};
@@ -31,7 +33,7 @@ function simil(h,o){const p={escenas:seqS(h.seq,o.seq||[]),skins:jac(h.skins,o.s
     'b-roll':jac(h.broll,o.broll||[]),arquetipo:+((h.arquetipo||'')===(o.arquetipo||'')),movimiento:jac(h.motion,o.motion||['mask'])};
   const Wt={escenas:.35,skins:.2,fondos:.1,subtítulos:.1,'b-roll':.1,arquetipo:.1,movimiento:.05};return {s:Object.keys(Wt).reduce((a,k)=>a+Wt[k]*p[k],0),p};}
 if(process.argv[2]==='--huellas'){const h=readJL(HUE).slice(-10);
-  console.log(h.length?'Estética de los últimos videos (elegir un arquetipo distinto al de los últimos 3 de la misma marca):\n'+h.map(e=>`  ${e.fecha}  ${e.video.padEnd(20)} ${String(e.marca).padEnd(16)} arq:${(e.arquetipo||'—').padEnd(12)} subs:${e.subs.padEnd(9)} fs:${e.fs.join('/')||'—'}  b-roll:${[...new Set(e.broll)].join('/')||'—'}  concept:${e.gramatica||'—'}/${e.concept_bg||'—'}\n      ${e.seq.map(x=>x.split(':')[0]).join(' > ')}  ·  skins: ${e.skins.filter(x=>!/\.default$/.test(x)).join(', ')||'todas default'}`).join('\n'):'Todavía no hay huellas (se guardan al correr director.js en cada video).');
+  console.log(h.length?'Estética de los últimos videos (elegir un arquetipo distinto al de los últimos 3 de la misma marca; no repetir héroe ni metáforas):\n'+h.map(e=>`  ${e.fecha}  ${e.video.padEnd(20)} ${String(e.marca).padEnd(16)} arq:${(e.arquetipo||'—').padEnd(12)} subs:${e.subs.padEnd(9)} fs:${e.fs.join('/')||'—'}  b-roll:${[...new Set(e.broll)].join('/')||'—'}  concept:${e.gramatica||'—'}/${e.concept_bg||'—'}\n      ${e.seq.map(x=>x.split(':')[0]).join(' > ')}  ·  skins: ${e.skins.filter(x=>!/\.default$/.test(x)).join(', ')||'todas default'}${e.heroe||(e.metaforas||[]).length?`\n      héroe: ${e.heroe||'—'}  ·  metáforas: ${(e.metaforas||[]).join(' · ')||'—'}  ·  ilu: ${(e.ilu||[]).join(', ')||'ninguna'}`:''}`).join('\n'):'Todavía no hay huellas (se guardan al correr director.js en cada video).');
   process.exit(0);}
 if(process.argv[2]==='--sembrar'){let H=readJL(HUE);for(const w of process.argv.slice(3).filter(w=>fs.existsSync(path.join(w,'jobs.json'))).sort((a,b)=>fs.statSync(path.join(a,'jobs.json')).mtimeMs-fs.statSync(path.join(b,'jobs.json')).mtimeMs)){try{const h=huella(path.resolve(w));H=H.filter(e=>e.video!==h.video);H.push(h);console.log('huella:',h.video,h.seq.length,'escenas');}catch(e){console.log('✗',w,e.message);}}writeJL(HUE,H);process.exit(0);}
 if(process.argv[2]==='--conceptos'){const h=readHist();
@@ -47,7 +49,7 @@ const ovl=(a,b)=>Math.max(0,Math.min(a.end,b.end)-Math.max(a.start,b.start));
 const f2=x=>x.toFixed(1)+'s';
 const ok=[],warn=[];const W=(m)=>warn.push(m),O=(m)=>ok.push(m);
 // ── Visual ──
-const OVER_BROLL=/sticker|hud|stamp|pensas|tracker/;
+const OVER_BROLL=/sticker|hud|stamp|pensas|tracker|ilu/;
 for(let i=0;i<ov.length;i++)for(let k=i+1;k<ov.length;k++)if(ovl(ov[i],ov[k])>0.1)W(`Dos tarjetas a la vez: ${ov[i].id} y ${ov[k].id} (${f2(ovl(ov[i],ov[k]))}). Mover una a ov2 solo si es un tracker, o separarlas.`);
 for(const b of B){
   for(const f of fsj)if(ovl(b,f)>0.1)W(`B-roll "${b.src}" (${f2(b.start)}) queda tapado por la pantalla completa ${f.id}: moverlo.`);
@@ -134,7 +136,23 @@ for(let i=1;i<framing.length;i++){const a=framing[i-1],b=framing[i];if(Math.abs(
 {const art=fs.existsSync(path.join(WD,'arte.json'))?rd('arte.json'):null,h=huella(WD),all=readJL(HUE).filter(e=>e.video!==cfg.name),prev=all.slice(-5);
  if(!art)W('Falta <work>/arte.json (paso 4-pre · dirección de arte): arquetipo, firma y momentos distintivos de ESTE video.');
  else{if(!art.arquetipo)W('arte.json no tiene "arquetipo".');if(!art.firma)W('arte.json no tiene "firma" (un recurso visual que se repite 2–3 veces).');
-  const same=all.filter(e=>e.marca===h.marca).slice(-3);if(art.arquetipo&&same.some(e=>e.arquetipo===art.arquetipo))W(`El arquetipo "${art.arquetipo}" ya se usó en ${same.filter(e=>e.arquetipo===art.arquetipo).map(e=>e.video).join(', ')} (misma marca): elegir otro (node director.js --huellas).`);}
+  const same=all.filter(e=>e.marca===h.marca).slice(-3);if(art.arquetipo&&same.some(e=>e.arquetipo===art.arquetipo))W(`El arquetipo "${art.arquetipo}" ya se usó en ${same.filter(e=>e.arquetipo===art.arquetipo).map(e=>e.video).join(', ')} (misma marca): elegir otro (node director.js --huellas).`);
+  // ── Tratamiento (SKILL.md 4-pre): mostrar, no escribir ──
+  const mg=jobs.filter(j=>j.track!=='cap'),ilus=mg.filter(j=>j.scene==='ilu');
+  if(!art.tratamiento)W('arte.json no tiene "tratamiento" (3 ideas madre de una línea → la más audaz que se entienda, en 1–2 líneas): de ahí salen el héroe y las metáforas.');
+  if(!(art.metaforas||[]).length)W('arte.json no tiene "metaforas" (una imagen por idea del guion: qué se VE, no qué se escribe).');
+  if(T>25&&!ilus.length)W('Ningún motion graphic superpuesto es una ilustración (escena "ilu", dibujada en ilustra.js): al menos una idea tiene que mostrarse como imagen y no como texto.');
+  else if(ilus.length)O(`Ilustraciones superpuestas: ${ilus.map(j=>j.p.fig||'?').join(', ')}.`);
+  if(ilus.length&&!fs.existsSync(path.join(WD,'ilustra.js')))W('Falta ilustra.js: las figuras de las escenas "ilu" se dibujan desde cero para cada video.');
+  if(T>25&&!art.heroe)W('arte.json no tiene "heroe": un objeto o personaje ilustrado que reaparece y se transforma (ilustración + concept o CTA).');
+  else if(art.heroe){const hs=mg.filter(j=>(j.scene==='ilu'&&j.p.fig===art.heroe)||j.p.heroe);
+   (hs.length<2?W:O)(hs.length<2?`El héroe "${art.heroe}" aparece ${hs.length} vez: tiene que volver al menos 2 veces (ilu con fig:'${art.heroe}', o heroe:true en el concept/CTA que lo dibuja con window.FIG).`:`Héroe "${art.heroe}" reaparece ${hs.length} veces (${hs.map(j=>j.id).join(', ')}).`);}
+  const ij=path.join(WD,'ilustra.js'),ejI=path.join(__dirname,'..','reference','ejemplo_ilustra.js');
+  if(fs.existsSync(ij)&&fs.existsSync(ejI)){const strip=s=>s.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,''),code=strip(fs.readFileSync(ij,'utf8')),lc=strip(fs.readFileSync(ejI,'utf8'));
+   const copied=lc.split(/(?=ILU\.\w+=|FIG\.\w+=)/).map(b=>b.slice(0,120)).filter(b=>b.length>=120&&code.includes(b));if(copied.length)W('ilustra.js copia código del ejemplo (reference/ejemplo_ilustra.js): las figuras se dibujan nuevas para este video.');}
+  const stop2=new Set('de la el los las un una que con por para en y o a se al del sus su lo como mas más'.split(' ')),kw2=x=>new Set(String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[^a-z]+/).filter(w=>w.length>3&&!stop2.has(w)));
+  for(const o of all.slice(-10)){if(art.heroe&&o.heroe&&kw2(art.heroe).size&&[...kw2(art.heroe)].some(w=>kw2(o.heroe).has(w)))W(`El héroe "${art.heroe}" se parece al de "${o.video}" (${o.heroe}): buscar otro protagonista.`);
+   for(const m of art.metaforas||[])for(const om of o.metaforas||[]){const mk=kw2(m);if([...kw2(om)].filter(w=>mk.has(w)).length>=2)W(`La metáfora "${m}" se parece a la de "${o.video}" (${om}): buscar otra imagen.`);}}}
  let best=null;for(const o of prev){const r=simil(h,o),eff=r.s*(o.marca===h.marca?1:.85);if(!best||eff>best.eff)best={o,eff,r};
   if(eff>=.6){const top=Object.entries(r.p).filter(([,v])=>v>=.7).map(([k])=>k).join(', ');W(`Se parece ${Math.round(r.s*100)} % a "${o.video}" (${o.marca}${o.marca===h.marca?', misma marca':''}): coinciden ${top||'muchas cosas'}. Cambiar skins, subtítulos, tratamiento del b-roll o el orden de las escenas.`);}}
  if(best&&best.eff<.6)O(`Estética distinta de los últimos videos (lo más parecido: "${best.o.video}", ${Math.round(best.r.s*100)} %).`);

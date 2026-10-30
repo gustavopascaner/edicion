@@ -55,7 +55,8 @@ function X(file,start,dur,gain,sin=0){extraSfx.push({file,start:+start.toFixed(3
 require(path.join(WD,'jobs.js'))({J,B,X,S,F,W,C,CE,R,H,SG,edl,cfg,FPS});
 // Dirección de arte (<work>/arte.json, SKILL.md 4-pre): skins por escena y lenguaje de movimiento por defecto (lo que ponga jobs.js manda)
 const ART=fs.existsSync(path.join(WD,'arte.json'))?JSON.parse(fs.readFileSync(path.join(WD,'arte.json'))):{};
-for(const j of jobs){const sk=(ART.skins||{})[j.scene];if(sk&&j.p.skin==null)j.p.skin=sk;if(ART.motion&&j.p.motion==null)j.p.motion=ART.motion;}
+for(const j of jobs){const sk=(ART.skins||{})[j.scene];if(sk&&j.p.skin==null)j.p.skin=sk;if(ART.motion&&j.p.motion==null)j.p.motion=ART.motion;
+  if(ART.vivo&&j.p.alive==null&&(j.track==='ov'||j.track==='ov2'))j.p.alive=true;}   // arte.json "vivo": las tarjetas flotan apenas una vez armadas
 // Estilo de subtítulos: config.caption_style > arte.json "subtitulos" > brand.json "captions" > 'box' (el de siempre)
 const CAPSTYLE=(c=>typeof c==='string'?{style:c}:c)(cfg.caption_style??ART.subtitulos??BRAND.captionStyle(BR)??null);
 if(CAPSTYLE&&CAPSTYLE.style&&CAPSTYLE.style!=='box')console.log(`subtítulos: estilo ${CAPSTYLE.style}`);
@@ -110,6 +111,7 @@ const AUTO={
   hud:p=>[['glitch',0],A('click',p.labAt)], pensas:p=>[...each(p.at,t=>A('pop',t)),A('hit',p.noAt)], tracker:()=>[],
   dm:p=>[['pop',0],A('pop',p.replyAt)], follow:p=>[['pop',0],A('click',p.clickAt)], comment:p=>[['pop',0],A('click',p.typeAt),A('click',p.sendAt)],
   book:p=>[['pop',0],A('click',p.btnAt),A('hit',p.stampAt)],
+  ilu:p=>[['pop',0],A('pop',p.at)],   // ilustración: entra con pop; su momento clave (p.at) cuenta como un acierto (ver puntaje)
   fsTitle:p=>[['whoosh',0],p.marks?A('error',p.marksAt):null], bigword:()=>[['hit',0]], counter:p=>[['whoosh',0],A('error',p.strikeAt)],
   metrics:p=>[['whoosh',0],...each(p.tiles,t=>A('pop',t.at)),A('hit',p.stampAt)], calendar:p=>[['whoosh',0],A('pop',p.qAt)],
 };
@@ -129,7 +131,7 @@ if(cfg.sound_design!=='manual'){
       const entry=e[1]===0,strongScene=/bigword|stamp/.test(j.scene);
       // puntaje: remates y revelaciones (fs) > CTA > b-roll > tarjetas > detalles internos (hit 9 · ✓ 5 · click 3,5 · ✗ 3 · pop 2 = bajo el mínimo)
       const score=entry?(j.track==='fs'?(strongScene?11:10):strongScene?9:isCta(j)?9:4)
-                       :(e[0]==='hit'?9:e[0]==='ding'?5:e[0]==='click'?3.5:e[0]==='error'?3:2);
+                       :(e[0]==='hit'?9:e[0]==='ding'||j.scene==='ilu'?5:e[0]==='click'?3.5:e[0]==='error'?3:2);
       ev.push({spec:e[0],t:j.start+e[1],o:{},score,why:`${j.id}${entry?'':' +'+e[1].toFixed(1)+'s'}`,alt:entry&&e[0]==='whoosh'?ALT.whoosh:null});}}
   for(const b of broll)ev.push({spec:'whoosh',t:b.start,o:{},score:6,why:'b-roll '+b.src,alt:ALT.whoosh});}
 const dropped=[];
@@ -227,6 +229,10 @@ const CONCEPT_JS=path.join(WD,'concept.js'),LEGACY=jobs.some(j=>j.scene==='conce
 if(jobs.some(j=>j.scene==='concept')){
   if(LEGACY)console.warn('⚠️  La pantalla conceptual usa un motivo viejo (`motif`): es una animación reciclada. Escribir una nueva en concept.js (ver SKILL.md paso 4).');
   else if(!fs.existsSync(CONCEPT_JS))console.warn(`⚠️  Falta ${CONCEPT_JS}: la pantalla conceptual se diseña y programa desde cero para cada video.`);}
+// Ilustraciones superpuestas (escena 'ilu'): figuras dibujadas desde cero para este video en <work>/ilustra.js (window.ILU / window.FIG).
+// Se carga ANTES de concept.js, así el concept puede reusar las figuras de window.FIG (el objeto héroe reaparece).
+const ILU_JS=path.join(WD,'ilustra.js');
+if(jobs.some(j=>j.scene==='ilu')&&!fs.existsSync(ILU_JS))console.warn(`⚠️  Falta ${ILU_JS}: las ilustraciones (escena "ilu") se dibujan desde cero para cada video (window.ILU={fig:(g,p,a,D,r)=>…}).`);
 async function main(){
   if(!CHROME)throw new Error('No encuentro Chrome. Instalalo o definí CHROME=/ruta/al/ejecutable');
   const only=process.argv.find(a=>a.startsWith('--only='));const test=process.argv.includes('--test');
@@ -242,7 +248,8 @@ async function main(){
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
     await page.goto(fileURL(path.join(ENG,'engine.html')));{const k=await BRAND.apply(page,BR);if(k&&k<.98&&!FIT_SAID){FIT_SAID=1;console.log(`marca: la tipografía de títulos es más ancha que la del motor → títulos al ${Math.round(k*100)} %`);}}await page.evaluate(()=>document.fonts.ready);
     await page.evaluate(L=>{window.SAFE=L.face?L:null;},LAY);
-    // animación conceptual de ESTE video (escrita desde cero) · los motivos viejos solo si una edición vieja usa `motif`
+    // ilustraciones y animación conceptual de ESTE video (escritas desde cero) · los motivos viejos solo si una edición vieja usa `motif`
+    if(fs.existsSync(ILU_JS))await page.addScriptTag({path:ILU_JS});
     if(fs.existsSync(CONCEPT_JS))await page.addScriptTag({path:CONCEPT_JS});
     if(LEGACY)await page.addScriptTag({path:path.join(__dirname,'..','reference','concept_ejemplos.js')});
     await page.evaluate((cc)=>{window.CAPCOL=cc;window.FMT={k:v=>(v/1000).toFixed(1).replace('.',',')+'K',m:v=>(v/1e6).toFixed(2).replace('.',',')+'M'}},cfg.caption_colors||(BR?BRAND.captionColors(BR):null));await page.evaluate(cs=>{window.CAPSTYLE=cs;},CAPSTYLE);

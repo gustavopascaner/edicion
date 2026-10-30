@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Paso 3: arma la línea de tiempo (un clip por región de voz) y VERIFICA el corte (align.py: Whisper con tiempos por palabra).
-uso: python3 -I edl.py <workdir> [--no-verify]   → <workdir>/edl.json (+ cut.wav, words.json y qa_words.json)
+uso: python3 -I edl.py <workdir> [--no-verify] [--no-aire]   → <workdir>/edl.json (+ cut.wav, words.json, qa_words.json, aire.md)
+Después de verificar corre aire.py (segunda pasada): saca las pausas que quedaron en el corte y las muletillas que Whisper no transcribe
+(voz sin palabra, «eh/este/bueno» fuera del guion); si encontró algo, reescribe tight.json y vuelve a armar y verificar el corte.
 Lee config.json (fps, tail = segundos extra al final; post_pad 0.08 / post_pad_end 0.14 = aire después de la voz).
 Garantías del corte (no se negocian):
   · entradas redondeadas hacia ATRÁS y salidas hacia ADELANTE (nunca se come el inicio ni la última letra por redondeo a frames)
@@ -23,14 +25,15 @@ def edb(k):
     seg=S[int(k*N):int((k+1)*N)]
     return 20*math.log10(max(1,math.sqrt(sum(x*x for x in seg)/len(seg)))/32768) if seg else -99
 ENV=[edb(k) for k in range(NFR)]
-FLOOR=sorted(ENV)[len(ENV)//10];QUIET=min(max(FLOOR+20,-46),-34)   # por debajo de QUIET el frame ya es silencio/ruido de fondo
+FLOOR=sorted(ENV)[len(ENV)//10];QUIET=max(min(max(FLOOR+20,-46),-34),FLOOR+8)   # por debajo de QUIET el frame ya es silencio/ruido de fondo. En una sala ruidosa (piso −38) el ruido fluctúa hasta −33: con −34 fijo la pausa
+# contaba como «voz» y los huecos de ≤ 3 frames se cerraban dejando la pausa entera (GUION3 30/10/2026) → nunca menos de piso + 8 (la «cola» de tighten.py)
 e_=lambda k:ENV[k] if 0<=k<NFR else -99
 # 1 · márgenes y redondeo hacia afuera
 iv=[]
 for ci,p in enumerate(P):
     nx=P[ci+1] if ci+1<len(P) else None;end=(not nx) or nx['seg']!=p['seg'] or p['t'].rstrip().endswith(('.',',',':',';','?','!','…'))
-    post=POST_END if end else POST
-    a=p['a']-PRE;b=p['b']+post+(TAIL if ci==len(P)-1 else 0)
+    post=p.get('post',POST_END if end else POST)   # aire.py achica los márgenes de los empalmes donde quedaba una pausa
+    a=p['a']-p.get('pre',PRE);b=p['b']+post+(TAIL if ci==len(P)-1 else 0)
     iv.append([max(0,math.floor(a*FPS+1e-6)),min(NFR,math.ceil(b*FPS-1e-6))])
 if cfg.get('start_zero') and iv: iv[0][0]=0   # gancho visual: el video arranca en el segundo 0 del master (silencio inicial a propósito); los subtítulos siguen a la voz
 # 2 · si la voz sigue sonando en el punto de corte, correr el corte hasta donde ya hay silencio (sin invadir al vecino)
@@ -61,12 +64,12 @@ for ci,p in enumerate(P):
     if d<=0: continue
     if clips and clips[-1]['src_out']==sin and clips[-1]['seg']==p['seg']:
         c=clips[-1];c['src_out']=sout;c['tl_out']+=d;c['text']+=' '+p['t']
-    else: clips.append(dict(i=len(clips),seg=p['seg'],src_in=sin,src_out=sout,tl_in=t,tl_out=t+d,text=p['t']))
-    t+=d;pieces.append((len(clips)-1,p))
+    else: clips.append(dict(i=len(clips),seg=p['seg'],src_in=sin,src_out=sout,tl_in=t,tl_out=t+d,text=p['t'],pieces=[]))
+    clips[-1]['pieces'].append(ci);t+=d;pieces.append((len(clips)-1,p,ci))
 for k,c in enumerate(clips):   # fade de 1 frame (dentro del margen de silencio) solo donde hay un corte real
     c['fade_in']=k==0 or clips[k-1]['src_out']!=c['src_in']
     c['fade_out']=k==len(clips)-1 or clips[k+1]['src_in']!=c['src_out']
-for ci,p in pieces:
+for ci,p,pi in pieces:
     c=clips[ci];words=p['t'].split();groups=[];cur=[]
     for wd in words:
         cur.append(wd)
@@ -80,7 +83,7 @@ for ci,p in pieces:
         d=(pb-pa)*len(' '.join(g))/tot;wl=[];ws=s;gl=sum(len(wd) for wd in g)
         for wd in g:
             wdur=d*len(wd)/gl;wl.append(dict(w=wd,s=TL(ws),e=TL(ws+wdur)));ws+=wdur
-        caps.append(dict(clip=ci,seg=p['seg'],tl_in=TL(s),tl_out=TL(s+d),text=' '.join(g),words=wl));s+=d
+        caps.append(dict(clip=ci,seg=p['seg'],pi=pi,tl_in=TL(s),tl_out=TL(s+d),text=' '.join(g),words=wl));s+=d
 for k in range(len(caps)-1):
     if caps[k+1]['tl_in']-caps[k]['tl_out']<12: caps[k]['tl_out']=caps[k+1]['tl_in']
 json.dump(dict(fps=FPS,total=t,clips=clips,caps=caps,src_frames=NFR),open(os.path.join(W,'edl.json'),'w'),ensure_ascii=False,indent=1)
@@ -95,4 +98,15 @@ if '--no-verify' not in sys.argv:
     cut=os.path.join(W,'cut.wav')
     subprocess.run(['ffmpeg','-v','error','-y','-i',os.path.join(W,'audio16k.wav'),'-/filter_complex',os.path.join(W,'fc_cut.txt'),'-map','[out]',cut],check=True)
     print('\n--- verificación del corte (Whisper SIN prompt, tiempos por palabra, clip por clip) ---',flush=True)
-    if subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'align.py'),W]).returncode: sys.exit(1)
+    SD=os.path.dirname(os.path.abspath(__file__))
+    if subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'align.py'),W]).returncode: sys.exit(1)
+    if cfg.get('aire',True) and '--no-aire' not in sys.argv:
+        if '--pass2' in sys.argv:   # ya es la segunda pasada: solo informar el aire que queda
+            print('\n--- aire restante (segunda pasada) ---',flush=True);subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'aire.py'),W,'--report'])
+        else:
+            print('\n--- aire y muletillas (pausas que quedaron, voz sin palabra, palabras fuera del guion) ---',flush=True)
+            rc=subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'aire.py'),W]).returncode
+            if rc==3:   # tight.json cambió: volver a armar el corte y verificarlo (una sola vez)
+                print('\n=== segunda pasada: corte sin ese aire ===',flush=True)
+                sys.exit(subprocess.run([sys.executable,'-X','utf8','-I',os.path.abspath(__file__),W,'--pass2']+[a for a in sys.argv[2:] if a not in('--pass2',)]).returncode)
+            elif rc not in(0,3): print('⚠️  aire.py falló: el corte queda sin la segunda pasada (revisar arriba)')

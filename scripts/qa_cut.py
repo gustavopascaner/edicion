@@ -14,7 +14,7 @@ w=wave.open(os.path.join(W,'audio16k.wav'));SR=w.getframerate();raw=w.readframes
 def rms(a,b):
     seg=S[max(0,int(a*SR)):int(b*SR)] or [0]
     return 20*math.log10(max(1,math.sqrt(sum(x*x for x in seg)/len(seg)))/32768)
-N=int(SR/FPS);ENV=[rms(k/FPS,(k+1)/FPS) for k in range(len(S)//N)];FLOOR=sorted(ENV)[len(ENV)//10];QUIET=min(max(FLOOR+20,-46),-34)
+N=int(SR/FPS);ENV=[rms(k/FPS,(k+1)/FPS) for k in range(len(S)//N)];FLOOR=sorted(ENV)[len(ENV)//10];QUIET=max(min(max(FLOOR+20,-46),-34),FLOOR+8)
 D=4   # decimado para la correlación (16 kHz → 4 kHz)
 def seg(a,b):
     x=S[max(0,int(a*SR)):int(b*SR)];return [sum(x[i:i+D])/D for i in range(0,len(x)-D+1,D)]
@@ -35,7 +35,7 @@ for k in range(len(E['clips'])-1):
     best=max(ncc(tail,head[o:]) if o>=0 else ncc(tail[-o:],head) for o in range(-40,41))   # ±10 ms a 4 kHz
     flags=[]
     if best>0.9 and max(e_out,e_in)>QUIET: flags.append('DUPLICADO');dup+=1
-    if e_out>QUIET or e_in>QUIET: flags.append('voz en el corte');voiced+=1
+    if e_out>QUIET+3 or e_in>QUIET+3: flags.append('voz en el corte');voiced+=1   # +3 dB: a 1–3 dB del umbral es cola de sala / roce, no voz (los empalmes apretados por aire.py quedan ahí)
     rows.append((k,to,e_out,e_in,m_out,m_in,best,flags))
 md=['# QA de empalmes','',f'{cuts} cortes reales · umbral de silencio {QUIET:.0f} dB (piso {FLOOR:.0f}) · {dup} duplicados · {voiced} con voz en el corte','',
     '| corte | en el crudo | sale (dB) | entra (dB) | silencio antes/después (fr) | parecido cola↔arranque | |','|---|---|---|---|---|---|---|']
@@ -43,11 +43,15 @@ for k,to,eo,ei,mo,mi,b,f in rows: md.append(f'| {k}→{k+1} | {to:.2f}s | {eo:.0
 qa=os.path.join(W,'qa_words.json')
 if os.path.exists(qa):
     q=json.load(open(qa));md+=['',f'## Whisper sin prompt ({len(q)} avisos)']+[f'- {x["msg"]}' for x in q]
+aire=os.path.join(W,'aire.md');AIRE=[]
+if os.path.exists(aire):   # segunda pasada (aire.py): pausas y muletillas que quedan en el corte
+    AIRE=[l for l in open(aire).read().splitlines() if l.startswith('- ⚠️')];md+=['',f'## Aire y muletillas que quedan ({len(AIRE)})']+(AIRE or ['- ninguna ✓'])
 open(os.path.join(W,'qa_cut.md'),'w').write('\n'.join(md)+'\n')
 print(f'{cuts} cortes reales: {dup} con audio duplicado · {voiced} con voz sonando en el empalme (umbral {QUIET:.0f} dB)')
 for k,to,eo,ei,mo,mi,b,f in rows:
     if f: print(f'  ⚠️  corte {k}→{k+1} en {to:.2f}s: {" + ".join(f)} (sale {eo:.0f} dB · entra {ei:.0f} dB · parecido {b:.2f})')
 if os.path.exists(qa):
     for x in json.load(open(qa)): print('  ⚠️ ',x['msg'])
+for l in AIRE: print('  ⚠️ ',l[4:].strip())
 print('detalle:',os.path.join(W,'qa_cut.md'))
 sys.exit(1 if dup else 0)

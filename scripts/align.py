@@ -74,7 +74,7 @@ for i,j in match.items():
 issues=[];ok=0
 for i,(ci,wi,wd) in enumerate(exp):
     if t0[i] is None: continue
-    lo,hi=clipb[E['caps'][ci]['clip']];wd['s']=max(lo,min(hi-1,t0[i]));ok+=1
+    lo,hi=clipb[E['caps'][ci]['clip']];wd['s']=max(lo,min(hi-1,t0[i]));wd['real']=True;ok+=1   # real = tiempo oído por Whisper (aire.py lo usa)
 # monotonía y fin de cada palabra = inicio de la siguiente del mismo clip (o su fin estimado)
 for ci,c in enumerate(E['caps']):
     ws=c['words']
@@ -92,6 +92,13 @@ json.dump(E,open(os.path.join(W,'edl.json'),'w'),ensure_ascii=False,indent=1)
 tl=lambda ms:ms/1000
 for i,(ci,wi,wd) in enumerate(exp):
     if i not in match: issues.append(dict(tipo='falta',t=round(wd['s']/FPS,2),w=wd['w'],msg=f"no se oye «{wd['w']}» en {wd['s']/FPS:.2f}s (¿arranque o última letra comida, o Whisper no la detectó?)"))
+def _spill(j):   # Whisper «completa» al final de un clip la primera palabra del clip siguiente (o al arranque, la última del anterior): no sobra nada
+    c=asr[j].get('clip');same=[k for k,a in enumerate(asr) if a.get('clip')==c]
+    if not same: return False
+    if j==same[-1]: nx=[i for i,(ci,wi,wd) in enumerate(exp) if E['caps'][ci]['clip']==c+1];return bool(nx) and en[nx[0]]==an[j]
+    if j==same[0]: pv=[i for i,(ci,wi,wd) in enumerate(exp) if E['caps'][ci]['clip']==c-1];return bool(pv) and en[pv[-1]]==an[j]
+    return False
+extra=[j for j in extra if not _spill(j)]
 for j in extra:
     if len(an[j])>=2: issues.append(dict(tipo='sobra',t=round(tl(asr[j]['frm']),2),w=asr[j]['t'],msg=f"suena «{asr[j]['t']}» en {tl(asr[j]['frm']):.2f}s y no está en el guion (¿fragmento repetido o toma sobrante?)"))
 for j in range(1,len(asr)):
@@ -135,7 +142,8 @@ for j in sorted(extra)+[None]:   # frases enteras que sobran (≥ 3 palabras seg
         issues.append(dict(tipo='sobra_frase',t=round(asr[run[0]]['frm']/1000,2),w=' '.join(asr[x]['t'] for x in run),bloquea=True,
             msg=f"suena «{' '.join(asr[x]['t'] for x in run[:10])}{'…' if len(run)>10 else ''}» en {asr[run[0]]['frm']/1000:.2f}s (clip {asr[run[0]].get('clip','?')}) y no está en el guion: ¿toma repetida o frase que falta en segs.json? → corregir segs.json"))
     run=[j] if j is not None else []
-json.dump([dict(w=a['t'],s=a['frm']/1000,e=a['to']/1000,clip=a.get('clip')) for a in asr],open(os.path.join(W,'words.json'),'w'),ensure_ascii=False)
+_used=set(match.values())
+json.dump([dict(w=a['t'],s=a['frm']/1000,e=a['to']/1000,clip=a.get('clip'),**({'x':True} if j not in _used else {})) for j,a in enumerate(asr)],open(os.path.join(W,'words.json'),'w'),ensure_ascii=False)   # x = oída pero no está en el guion (aire.py la evalúa como muletilla)
 json.dump(issues,open(os.path.join(W,'qa_words.json'),'w'),ensure_ascii=False,indent=1)
 print(' '.join(a['t'] for a in asr))
 blk=[x for x in issues if x.get('bloquea')]

@@ -23,6 +23,17 @@ def probe_frames(p): return int(round(float(subprocess.run(['ffprobe','-v','erro
 SRC_FRAMES=probe_frames(SRC)
 uid=[0]
 def nid(p): uid[0]+=1; return f'{p}-{uid[0]}'
+def file_tc(path,tb):
+    # timecode de arranque embebido (Envato/cámaras lo traen, ej. 00:03:34:15). Premiere lo ignora; DaVinci lo lee y,
+    # si el XML dice 00:00:00:00, marca "sin superposición de códigos de tiempo" y deja el clip mal vinculado.
+    try:
+        o=subprocess.run(['ffprobe','-v','error','-show_entries','stream_tags=timecode:format_tags=timecode','-of','csv=p=0',path],capture_output=True,text=True).stdout
+        m=re.search(r'(\d\d):(\d\d):(\d\d)[:;](\d\d)',o)
+        if m:
+            h,mi,se,fx=map(int,m.groups())
+            return f'{h:02d}:{mi:02d}:{se:02d}:{fx:02d}',((h*60+mi)*60+se)*int(tb)+fx
+    except Exception: pass
+    return '00:00:00:00',0
 done=set()
 def file_el(fid,path,frames,video=True,audio=False,w=1080,h=1920,ch=2,rate=None):
     if fid in done: return f'<file id="{fid}"/>'
@@ -30,8 +41,10 @@ def file_el(fid,path,frames,video=True,audio=False,w=1080,h=1920,ch=2,rate=None)
     if video: m+=f'<video><samplecharacteristics>{RATE}<width>{w}</width><height>{h}</height><anamorphic>FALSE</anamorphic><pixelaspectratio>square</pixelaspectratio><fielddominance>none</fielddominance></samplecharacteristics></video>'
     if audio: m+=f'<audio><samplecharacteristics><depth>16</depth><samplerate>48000</samplerate></samplecharacteristics><channelcount>{ch}</channelcount></audio>'
     m+='</media>';FR=f'<rate><timebase>{rate}</timebase><ntsc>FALSE</ntsc></rate>' if rate else RATE
+    tcs,tcf=file_tc(path,rate or FPS)
+    TR=f'<rate><timebase>{rate}</timebase><ntsc>FALSE</ntsc></rate>' if rate else RATE
     return (f'<file id="{fid}"><name>{escape(os.path.basename(path))}</name><pathurl>{url(path)}</pathurl>{FR}<duration>{frames}</duration>'
-            f'<timecode>{RATE}<string>00:00:00:00</string><frame>0</frame><displayformat>NDF</displayformat></timecode>{m}</file>')
+            f'<timecode>{TR}<string>{tcs}</string><frame>{tcf}</frame><displayformat>NDF</displayformat></timecode>{m}</file>')
 def motion(scale,kf=None):
     v=f'<value>{scale}</value>'+(''.join(f'<keyframe><when>{w}</when><value>{s}</value></keyframe>' for w,s in kf) if kf else '')
     return ('<filter><effect><name>Basic Motion</name><effectid>basic</effectid><effectcategory>motion</effectcategory><effecttype>motion</effecttype><mediatype>video</mediatype>'

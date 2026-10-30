@@ -11,6 +11,12 @@ function Info($m) { Write-Host "... $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "!!  $m" -ForegroundColor Yellow }
 function Refresh-Path { $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User") }
 function Has($cmd) { [bool](Get-Command $cmd -ErrorAction SilentlyContinue) }
+# --ssl-no-revoke: con antivirus o proxy, schannel a veces no puede comprobar la revocación (CRYPT_E_NO_REVOCATION_CHECK)
+function Download($dst, $url, $name) {
+  curl.exe -L --fail --ssl-no-revoke -o $dst $url
+  if ($LASTEXITCODE -eq 0) { Ok $name }
+  else { Remove-Item $dst -Force -ErrorAction SilentlyContinue; Warn "No se pudo descargar: $name (curl salió con $LASTEXITCODE). Volvé a correr este script" }
+}
 
 if (-not (Has "winget")) { Warn "Falta winget (App Installer). Instalalo desde Microsoft Store: 'App Installer', y volvé a correr este script."; exit 1 }
 $W = @("--exact","--silent","--accept-package-agreements","--accept-source-agreements")
@@ -57,16 +63,14 @@ if ((Test-Path $M) -and ((Get-Item $M).Length -gt 1GB)) { Ok "Modelo de Whisper 
 else {
   Info "Descargando el modelo de Whisper (~1,6 GB, tarda unos minutos)..."
   New-Item -ItemType Directory -Force -Path (Split-Path $M) | Out-Null
-  curl.exe -L --fail -o $M "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
-  Ok "Modelo de Whisper"
+  Download $M "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin" "Modelo de Whisper"
 }
 # 3b · Modelo cuantizado (~550 MB) para el perfil liviano (8 GB): 2-3x más rápido en CPU y ~1 GB menos de RAM
 $Q = Join-Path $HOME ".cache\whisper-cpp\ggml-large-v3-turbo-q5_0.bin"
 if ((Test-Path $Q) -and ((Get-Item $Q).Length -gt 400MB)) { Ok "Modelo liviano de Whisper ya descargado" }
 else {
   Info "Descargando el modelo liviano de Whisper (~550 MB)..."
-  curl.exe -L --fail -o $Q "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
-  Ok "Modelo liviano de Whisper"
+  Download $Q "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin" "Modelo liviano de Whisper"
 }
 if (-not (Test-Path (Join-Path $WD "whisper-server.exe"))) { Warn "Falta whisper-server.exe en $WD (se usa whisper-cli, más lento): borrá esa carpeta y volvé a correr este script" }
 
@@ -84,7 +88,8 @@ foreach ($d in @("$HOME\.codex\skills", "$HOME\.claude\skills")) {
   $link = Join-Path $d "edicion"
   if (Test-Path $link) {
     $it = Get-Item $link -Force
-    if ($it.LinkType) { Remove-Item $link -Force } else { Warn "$link ya existe y no es un enlace: lo dejo como está"; continue }
+    # Remove-Item sobre una junction falla en PowerShell 5.1 (NullReferenceException); Delete() borra solo el enlace
+    if ($it.LinkType) { $it.Delete() } else { Warn "$link ya existe y no es un enlace: lo dejo como está"; continue }
   }
   New-Item -ItemType Junction -Path $link -Target $SK | Out-Null; Ok "Skill enlazada en $link"
 }

@@ -11,6 +11,7 @@ uso:
   envato.py use <work> <clave> <búsqueda>#<n> [--preview]  (ej. kl video_doctor-talking#3) → registra la elección en config.json
         (broll[clave] o music) como PENDIENTE de descarga; --preview = usar la vista previa con marca de agua (solo si no se puede licenciar ya)
   envato.py collect <work> [--from ~/Downloads] [--wait 300] [--file <clave> <archivo>]  → toma los originales licenciados de Descargas
+        (por nombre; si Envato lo bajó con otro nombre, los videos se reconocen comparándolos con la vista previa)
         (los copia a Assets/Envato y borra de Descargas lo bajado, para no duplicar)
         (--wait = esperar hasta N s a que terminen de bajar)
   envato.py report <work>                          → tabla de procedencia (para el LEEME)
@@ -131,6 +132,34 @@ def entries(c):
         if b.get('envato'): yield k,b
     if isinstance(c.get('music'),dict) and c['music'].get('envato'): yield 'music',c['music']
 PART=('.crdownload','.download','.part','.tmp')
+def thumbs(p,dur,n=3):
+    """huella del video: n cuadros en gris de 16×16 (al 25/50/75 %)"""
+    out=[]
+    for i in range(1,n+1):
+        r=subprocess.run(['ffmpeg','-v','error','-ss',f'{dur*i/(n+1):.2f}','-i',p,'-vf','scale=16:16:flags=area,format=gray','-frames:v','1','-f','rawvideo','-'],capture_output=True).stdout
+        if len(r)!=256: return None
+        out.append(r)
+    return out
+def match_by_content(e,files,used):
+    """Envato baja los archivos con un nombre distinto del de la página (ej. «medical-professional-scanning-…» para
+    «dentist-scanning-patients-…»): si no coincide el nombre, se reconoce el original comparándolo con la vista previa
+    (duración ±1 s y 3 cuadros chicos). Devuelve (archivo, diferencia) o (None, motivo)."""
+    if e['kind']!='video': return None,'la música se reconoce por el nombre (su vista previa junta todas las versiones del tema)'
+    pv=e.get('preview')
+    if not pv or not os.path.exists(pv): return None,'sin vista previa para comparar'
+    try: dp=probe(pv)['dur']
+    except Exception: return None,'no se pudo leer la vista previa'
+    best=(None,999)
+    for f in files:
+        if f in used: continue
+        try: d=probe(f)['dur']
+        except Exception: continue
+        if abs(d-dp)>1.0: continue
+        a,b=thumbs(pv,min(d,dp)),thumbs(f,min(d,dp))
+        if not a or not b: continue
+        diff=sum(abs(x-y) for ta,tb in zip(a,b) for x,y in zip(ta,tb))/768   # medido: el original da 3–5, otro video ≥ 30
+        if diff<best[1]: best=(f,diff)
+    return (best[0],best[1]) if best[0] and best[1]<15 else (None,'ningún video de Descargas se parece a la vista previa')
 def collect(W,src,manual=None,wait=0):
     if wait>300: print(f'ℹ️  --wait {wait:.0f} s es demasiado: espero 300 s como máximo (si no llegan, usar --preview y seguir; SKILL.md 4a)');wait=300
     t_end=time.time()+wait
@@ -142,6 +171,7 @@ def collect(W,src,manual=None,wait=0):
 def _collect(W,src,manual=None):
     c=cfgio(W);dst=os.path.join(c['edit_dir'],'Assets','Envato');os.makedirs(dst,exist_ok=True);tmp=os.path.join(W,'envato','_unzip')
     VID=('.mp4','.mov','.m4v');AUD=('.wav','.aif','.aiff','.mp3','.m4a')
+    used=set()
     for k,b in entries(c):
         e=b['envato']
         if e['status']=='licensed' and not manual: continue
@@ -151,10 +181,14 @@ def _collect(W,src,manual=None):
         else:
             cands=[os.path.join(src,f) for f in os.listdir(src) if ((base and base in norm(f)) or iid in f.lower()) and not f.lower().endswith(PART)]
             cands=[p for p in cands if os.path.getmtime(p)>=e.get('chosen',0)-86400*30]
-            if not cands: print(f'… {k}: todavía no está en {src} ({e["title"]})');continue
+            if not cands:
+                loose=[os.path.join(src,f) for f in os.listdir(src) if f.lower().endswith(VID) and not f.lower().endswith(PART) and os.path.getmtime(os.path.join(src,f))>=e.get('chosen',0)-3600]
+                f,why=match_by_content(e,loose,used)
+                if not f: print(f'… {k}: todavía no está en {src} ({e["title"]}; {why})');continue
+                print(f'  {k}: reconocido por contenido → {os.path.basename(f)} (diferencia {why:.1f})');cands=[f]
             found=max(cands,key=os.path.getmtime);sz=os.path.getsize(found);time.sleep(1)
             if os.path.getsize(found)!=sz: print(f'… {k}: todavía bajando');continue
-        dl=found   # lo descargado (archivo o zip): se borra de Descargas cuando el original ya quedó copiado en Assets
+        used.add(found);dl=found   # lo descargado (archivo o zip): se borra de Descargas cuando el original ya quedó copiado en Assets
         if found.lower().endswith('.zip'):
             shutil.rmtree(tmp,ignore_errors=True);zipfile.ZipFile(found).extractall(tmp)
             media=[os.path.join(r,f) for r,_,fs in os.walk(tmp) for f in fs if '__MACOSX' not in r and f.lower().endswith(VID if e['kind']=='video' else AUD)]

@@ -87,18 +87,40 @@ def text(wav,W=None,prompt=None):
     return ' '.join((remote(wav,prompt).get('text') or '').split())
 
 # --- una pasada: todo el audio una vez con tiempos por palabra ---
+def _nm(s):
+    import re,unicodedata
+    return re.sub(r'[^a-z0-9ñ]','',unicodedata.normalize('NFD',s.lower().replace('ñ','\0')).encode('ascii','ignore').decode().replace('\0','ñ'))
+def local_words(wav,threads=None):
+    """Palabras [{t,a,b}] (segundos) con whisper-cli LOCAL: una palabra por segmento (-ml 1 -sow); los sub-tokens y la puntuación
+    se pegan a su palabra. Los tiempos de un archivo largo se corren hasta 1–2 s: para tiempos finos usar ventanas cortas (align.py)."""
+    base=wav[:-4]+'_words';js=base+'.json'
+    if os.path.exists(js): os.unlink(js)
+    for _ in range(2):
+        subprocess.run([WHISPER,'-m',MODEL,'-f',wav,'-l','es','-np','-t',str(threads or THREADS),'-ml','1','-sow','-ojf','-of',base],capture_output=True)
+        if os.path.exists(js): break
+    if not os.path.exists(js): return []
+    out=[]
+    for s in json.load(open(js,encoding='utf-8')).get('transcription',[]):
+        tx=s['text'];o=s['offsets']
+        if not _nm(tx): continue
+        if out and not tx.startswith(' ') and not tx.lstrip()[:1] in ('¿','¡'): out[-1]['t']+=tx;out[-1]['b']=o['to']/1000;continue
+        out.append(dict(t=tx.strip(),a=o['from']/1000,b=o['to']/1000))
+    os.unlink(js);return out
 def words(W,wav):
-    """Palabras [{t,a}] (a = arranque en segundos) de todo el wav, transcripto una sola vez. Se guarda en <W>/words_full.json mientras el wav no cambie."""
+    """Palabras [{t,a,b}] (a = arranque en segundos) de todo el wav, transcripto una sola vez (remoto en el liviano, whisper-cli en el potente).
+    Se guarda en <W>/words_full.json mientras el wav no cambie."""
     st=os.stat(wav);key=[st.st_size,int(st.st_mtime)];cache=os.path.join(W,'words_full.json')
     try:
         c=json.load(open(cache,encoding='utf-8'))
         if c['key']==key: return c['words']
     except Exception: pass
-    # OpenAI pega el arranque de cada palabra al final de la anterior (se come el silencio): el arranque real sale del final
-    t0=time.time();out=[dict(t=w['t'],a=round(max(w['a'],w['b']-0.2),2)) for w in remote_words(wav)]
+    t0=time.time()
+    if liviano(W):   # OpenAI pega el arranque de cada palabra al final de la anterior (se come el silencio): el arranque real sale del final
+        out=[dict(t=w['t'],a=round(max(w['a'],w['b']-0.2),2),b=round(w['b'],2)) for w in remote_words(wav)];src='remoto'
+    else: out=[dict(t=w['t'],a=round(w['a'],2),b=round(w['b'],2)) for w in local_words(wav)];src='local'
     if not out: return None
-    json.dump(dict(key=key,words=out,src='remoto'),open(cache,'w',encoding='utf-8'),ensure_ascii=False)
-    print(f'transcripción de una pasada (remota): {len(out)} palabras en {time.time()-t0:.0f}s',file=sys.stderr);return out
+    json.dump(dict(key=key,words=out,src=src),open(cache,'w',encoding='utf-8'),ensure_ascii=False)
+    print(f'transcripción de una pasada ({src}): {len(out)} palabras en {time.time()-t0:.0f}s',file=sys.stderr);return out
 def span(ws,a,b):
     """Texto de las palabras que arrancan en [a, b] (DTW marca el arranque con ~0,1 s de margen)."""
     return ' '.join(w['t'] for w in ws if a-0.12<=w['a']<=b+0.08)

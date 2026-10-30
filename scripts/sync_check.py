@@ -8,7 +8,9 @@ Comprueba (todo debe dar ✓):
   4 · ningún clip se sale del archivo (in/out dentro del master)
   5 · el audio del origen no se repite entre clips (ningún rango del master suena dos veces)
   6 · cada motion graphic / subtítulo (.mov) existe y mide exactamente los fotogramas del clip que ocupa (si no, se corre de la voz)
-  7 · lo que dijo Whisper del corte (qa_words.json): palabras que faltan / sobran (aviso, no bloquea)
+  7 · lo que dijo Whisper del corte (qa_words.json): palabras que faltan / sobran (aviso) y, BLOQUEANDO, que el corte coincida con el
+      guion: cada palabra del subtítulo se oye en su clip, ningún clip de silencio lleva subtítulo, ninguna frase suena fuera del guion
+      (antes esto no se verificaba y un XML con subtítulos corridos hasta 4 s salía como «TODO SINCRONIZADO», GUION3 30/10/2026)
 """
 import os as _o,sys as _s,subprocess as _sp
 if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
@@ -83,8 +85,9 @@ elif mg and not any('mide' in b for b in bad): ok.append(f'{mg} motion graphics 
 qa=os.path.join(W,'qa_words.json')
 if os.path.exists(qa):
     q=json.load(open(qa))
-    for x in q: warn.append(x['msg'])
-    if not q: ok.append('Whisper (sin prompt) oye todas las palabras del guion y ninguna de más')
+    for x in q: (bad if x.get('bloquea') else warn).append(x['msg'])
+    if not q: ok.append('Whisper (sin prompt) oye todas las palabras del guion, cada una en su clip, y ninguna de más')
+    elif not any(x.get('bloquea') for x in q): ok.append('cada palabra del subtítulo se oye en su clip (texto ↔ voz)')
 else: warn.append('sin qa_words.json: no se verificó el corte con Whisper (edl.py --no-verify)')
 print('── Auditoría de sincronía ──')
 for x in ok: print('✓',x)

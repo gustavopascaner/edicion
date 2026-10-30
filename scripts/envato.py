@@ -132,10 +132,12 @@ def entries(c):
     if isinstance(c.get('music'),dict) and c['music'].get('envato'): yield 'music',c['music']
 PART=('.crdownload','.download','.part','.tmp')
 def collect(W,src,manual=None,wait=0):
+    if wait>300: print(f'ℹ️  --wait {wait:.0f} s es demasiado: espero 300 s como máximo (si no llegan, usar --preview y seguir; SKILL.md 4a)');wait=300
     t_end=time.time()+wait
     while True:
         pend=_collect(W,src,manual)
-        if not pend or manual or time.time()>=t_end: break
+        if not pend or manual: break
+        if time.time()>=t_end: print('⏱  se terminó la espera: los que faltan quedan pendientes (envato.py use … --preview para seguir sin ellos)');break
         time.sleep(5)
 def _collect(W,src,manual=None):
     c=cfgio(W);dst=os.path.join(c['edit_dir'],'Assets','Envato');os.makedirs(dst,exist_ok=True);tmp=os.path.join(W,'envato','_unzip')

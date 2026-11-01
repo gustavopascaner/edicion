@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Modo lote de /edicion: varios crudos INDEPENDIENTES (nunca se unen), procesados en cola sin saturar la máquina.
 Todo lo pesado (conform, Whisper, render, ffmpeg que reencodea) pasa por un candado global (~/.cache/edicion/pesado.lock):
-corre UNO a la vez en toda la máquina, con `nice` y hilos limitados. Los logs van a archivo; en cola.json solo quedan 2-3 líneas.
+corre UNO a la vez en toda la máquina, con prioridad baja (`nice` en Mac/Linux, BELOW_NORMAL en Windows) y hilos limitados.
+Los logs van a archivo; en cola.json solo quedan 2-3 líneas. Funciona en macOS y Windows (candado fcntl / msvcrt).
+Perfil liviano (8 GB, ej. la Windows del editor; mismo criterio que whisperlib/platform.js): 2 planificadores, 2 pestañas de render
+(tope 3 aunque cola.json diga más; `--par N` lo pisa), la mitad de los núcleos (máx. 4) y apaga el whisper-server local antes de renderizar.
 Se puede retomar: cada comando salta lo que ya está hecho según cola.json.
 
 uso: python3 -I cola.py <comando> <carpeta> [...]
@@ -20,21 +23,46 @@ uso: python3 -I cola.py <comando> <carpeta> [...]
   render   <carpeta> [--id X] [--par N]                             corte + MG + subtítulos + mezcla + XML de cada «planificado», de a uno
 Concurrencia y hilos: "concurrencia" en cola.json (pesado=1 siempre; whisper_threads, render_par, nice, planificadores).
 """
-import fcntl,glob,hashlib,json,os,re,subprocess,sys,time,contextlib,unicodedata
+import os as _o,sys as _s,subprocess as _sp
+if _o.name=='nt' and __name__=='__main__' and not _s.flags.utf8_mode: _s.exit(_sp.run([_s.executable,'-X','utf8','-I',_o.path.abspath(__file__),*_s.argv[1:]]).returncode)  # Windows: acentos en UTF-8
+import glob,hashlib,json,os,re,subprocess,sys,time,contextlib,unicodedata
+WIN=os.name=='nt'
+if WIN: import msvcrt
+else: import fcntl
 NFC=lambda p:unicodedata.normalize('NFC',p)   # macOS devuelve rutas en NFD: los scripts comparan en NFC
 SK=os.path.dirname(os.path.dirname(os.path.abspath(__file__)));SC=os.path.join(SK,'scripts')
-PY=[sys.executable,'-I'];LOCKDIR=os.path.expanduser('~/.cache/edicion');os.makedirs(LOCKDIR,exist_ok=True)
-DEF_CONC={'pesado':1,'planificadores':3,'whisper_threads':6,'render_par':4,'nice':10}
+PY=[sys.executable]+(['-X','utf8'] if WIN else [])+['-I'];LOCKDIR=os.path.expanduser('~/.cache/edicion');os.makedirs(LOCKDIR,exist_ok=True)
+sys.path.insert(0,SC);import whisperlib
+LIVIANO=whisperlib.liviano()   # EDICION_PERFIL, --perfil= o RAM < 12 GB
+DEF_CONC=({'pesado':1,'planificadores':2,'whisper_threads':max(1,min(4,(os.cpu_count() or 4)//2)),'render_par':2,'nice':10} if LIVIANO
+          else {'pesado':1,'planificadores':3,'whisper_threads':6,'render_par':4,'nice':10})
+def conc(q):
+    """concurrencia efectiva: la de cola.json sobre los defaults del perfil; en el liviano, tope de pestañas e hilos (un cola.json hecho en la Mac no satura la notebook)"""
+    C=dict(DEF_CONC);C.update(q.get('concurrencia') or {})
+    if LIVIANO: C['render_par']=min(int(C['render_par']),3);C['whisper_threads']=min(int(C['whisper_threads']),DEF_CONC['whisper_threads'])
+    return C
+def bajo(cmd,C):
+    """prioridad baja: nice en Mac/Linux; BELOW_NORMAL en Windows (los hijos la heredan: node, Chrome, ffmpeg)"""
+    if WIN: return cmd,{'creationflags':getattr(subprocess,'BELOW_NORMAL_PRIORITY_CLASS',0x4000)}
+    return ['nice','-n',str(C.get('nice',10))]+cmd,{}
 ESTADOS=('pendiente','preparado','planificado','renderizado','error')
 PLAN_IN=('segs.json','jobs.js','arte.json','concept.js','ilustra.js','plan.json')
 now=lambda:time.strftime('%Y-%m-%d %H:%M:%S')
 
 @contextlib.contextmanager
 def lock(name):
-    with open(os.path.join(LOCKDIR,name),'w') as f:
-        fcntl.flock(f,fcntl.LOCK_EX)
-        try: yield
-        finally: fcntl.flock(f,fcntl.LOCK_UN)
+    with open(os.path.join(LOCKDIR,name),'a+') as f:
+        if WIN:   # msvcrt.locking(LK_LOCK) se rinde a los 10 s: reintentar sin límite (un render tarda minutos)
+            f.seek(0)
+            while True:
+                try: msvcrt.locking(f.fileno(),msvcrt.LK_NBLCK,1);break
+                except OSError: time.sleep(1)
+            try: yield
+            finally: f.seek(0);msvcrt.locking(f.fileno(),msvcrt.LK_UNLCK,1)
+        else:
+            fcntl.flock(f,fcntl.LOCK_EX)
+            try: yield
+            finally: fcntl.flock(f,fcntl.LOCK_UN)
 
 def qpath(c): return os.path.join(os.path.abspath(c),'cola.json')
 def load(c):
@@ -59,13 +87,13 @@ def tail(log,n=3):
     return ' · '.join(L[-n:])[-400:]
 
 def run(cmd,log,q,heavy=True):
-    """Corre un paso con nice e hilos limitados; la salida va al log. Devuelve el código de salida."""
-    C=q.get('concurrencia',DEF_CONC);env=dict(os.environ,EDICION_THREADS=str(C.get('whisper_threads',6)),OMP_NUM_THREADS=str(C.get('whisper_threads',6)))
-    full=['nice','-n',str(C.get('nice',10))]+cmd
+    """Corre un paso con prioridad baja e hilos limitados; la salida va al log. Devuelve el código de salida."""
+    C=conc(q);env=dict(os.environ,EDICION_THREADS=str(C['whisper_threads']),OMP_NUM_THREADS=str(C['whisper_threads']))
+    full,kw=bajo(cmd,C)
     with (lock('pesado.lock') if heavy else contextlib.nullcontext()):
         with open(log,'a') as f:
             f.write(f'\n===== {now()} · {" ".join(cmd[1:3] if cmd[0]!="node" else cmd[:3])}\n');f.flush()
-            return subprocess.run(full,stdout=f,stderr=subprocess.STDOUT,env=env).returncode
+            return subprocess.run(full,stdout=f,stderr=subprocess.STDOUT,env=env,**kw).returncode
 
 # ---------- init ----------
 def nombre(src,prefijo):
@@ -143,9 +171,9 @@ def cmd_marcar(c,args):
 def cmd_check(W,args):
     q={'concurrencia':DEF_CONC};cq=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(W))),'cola.json')
     if os.path.exists(cq): q=json.load(open(cq))
-    C=q.get('concurrencia',DEF_CONC);env=dict(os.environ,EDICION_THREADS=str(C.get('whisper_threads',6)))
+    C=conc(q);env=dict(os.environ,EDICION_THREADS=str(C['whisper_threads']));full,kw=bajo(PY+[os.path.join(SC,'check.py'),W]+args,C)
     with lock('pesado.lock'):
-        sys.exit(subprocess.run(['nice','-n',str(C.get('nice',10))]+PY+[os.path.join(SC,'check.py'),W]+args,env=env).returncode)
+        sys.exit(subprocess.run(full,env=env,**kw).returncode)
 
 def cmd_huellas(c,_=None):
     for a in sorted(glob.glob(os.path.join(os.path.abspath(c),'*_EDIT','.work','arte.json'))):
@@ -174,8 +202,10 @@ def avisos(W):
     return k
 
 def cmd_render(c,args):
-    only=args[args.index('--id')+1] if '--id' in args else None;q=load(c);C=q.get('concurrencia',DEF_CONC)
-    par=args[args.index('--par')+1] if '--par' in args else str(C.get('render_par',4));res=[]
+    only=args[args.index('--id')+1] if '--id' in args else None;q=load(c);C=conc(q)
+    par=args[args.index('--par')+1] if '--par' in args else str(C['render_par']);res=[]
+    if LIVIANO: subprocess.run(PY+[os.path.join(SC,'whisperlib.py'),'stop'],capture_output=True)   # libera la RAM de un whisper-server que haya quedado
+    print(f"perfil {'liviano' if LIVIANO else 'potente'} · {par} pestañas de render · {C['whisper_threads']} hilos",flush=True)
     for v in q['videos']:
         if only and v['id']!=only: continue
         if v['estado']!='planificado' and not (v['estado']=='error' and v.get('etapa')=='render' and v.get('reintentar')): continue

@@ -70,7 +70,9 @@ md=['# Mezcla (voz · música · SFX)','',f'- Voz de la línea de tiempo: **{vi[
     f'- Voz − música mientras habla: mediana **{ratio[0]:.1f} dB** · 10 % peor **{ratio[1]:.1f} dB** (mínimo exigido {MIN_RATIO:g})',
     f'- Mezcla de referencia: **{mi["I"]:.1f} LUFS** integrados · LRA {mi["LRA"]} · true peak **{mi["TP"]} dBTP**',f'- SFX: {len(sfx)} (la verificación fina de niveles está en sfx.json / director.js)','']
 bad=[]
-if mi['TP'] is not None and mi['TP']>-1.0: bad.append(f'true peak de la mezcla {mi["TP"]} dBTP (> −1): bajar SFX/música o la voz')
+if mi['TP'] is not None and mi['TP']>-1.0:
+    if vi['TP'] is not None and vi['TP']>-1.0 and mi['TP']<=vi['TP']+0.3: md.append(f'- ⚠️ true peak {mi["TP"]} dBTP: viene de la voz tal cual se grabó ({vi["TP"]} dBTP; la música y los SFX no lo suben). No se procesa la voz: si hace falta, limitador en Premiere al exportar.')
+    else: bad.append(f'true peak de la mezcla {mi["TP"]} dBTP (> −1): bajar SFX/música o la voz')
 if ratio[1]<MIN_RATIO-0.5: bad.append(f'la música compite con la voz en el 10 % de los tramos ({ratio[1]:.1f} dB < {MIN_RATIO:g})')
 if abs(mi['I']-vi['I'])>3: bad.append(f'la mezcla quedó en {mi["I"]:.1f} LUFS, lejos de la voz ({vi["I"]:.1f})')
 md+=['## Problemas']+([f'- ✗ {b}' for b in bad] or ['- Ninguno ✓'])

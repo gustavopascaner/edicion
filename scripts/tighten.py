@@ -103,3 +103,5 @@ for p in out: print(f"{p['seg']:02d} {p['a']:7.2f}-{p['b']:7.2f} ({p['b']-p['a']
 if BREATHS: print(f'{BREATHS} respiración(es)/ruido corto fuera del corte (regiones < 0,35 s a más de 12 dB bajo el habla)')
 for a,b,h in MULET: print(f'muletilla fuera del corte: {a:.2f}-{b:.2f} ({b-a:.2f} s) se oye «{h}»')
 json.dump(out,open(os.path.join(W,'tight.json'),'w'),ensure_ascii=False,indent=1)
+for f in('aire_protect.json','aire_valles.json'):   # corte nuevo: los valles que aire.py tuvo que devolver eran del anterior
+    if os.path.exists(os.path.join(W,f)): os.remove(os.path.join(W,f))

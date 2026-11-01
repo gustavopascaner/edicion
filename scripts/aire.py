@@ -6,6 +6,11 @@ energía (no son silencio) y Whisper no los transcribe, así que quedaban adentr
 después de «un montón de cosas» y 8–19 pausas de 0,3–0,7 s por video). Acá se trabaja sobre el CORTE con las palabras que Whisper
 oyó clip por clip (tiempos fiables a ±0,1 s, align.py):
   · PAUSA: tramo por debajo del nivel de habla (relativo: p70 − 14 dB) de ≥ config.pause_max (0,30 s) → se achica a ~0,2 s
+  · VALLE: tramo bastante por debajo del habla (p70 − config.valle_db, 7 dB; suavizado 50 ms) de ≥ config.valle_min (0,40 s) que
+    no llega al umbral de pausa: aire, respiración larga o ruido de sala por encima del piso. Se transcribe SOLO con Whisper (sin prompt):
+    si no oye nada o solo una alucinación conocida («Gracias», «CC por…») es una pausa; si oye una palabra, no se toca. No depende de
+    los tiempos por palabra: Whisper estira una palabra sobre el silencio que la sigue («prejuicios» 1,26 s en GUION3, 31/10/2026:
+    quedaba 1,4 s de aire a −27 dB, 10 dB sobre el piso y 2 dB sobre el umbral de pausa, y aire.py informaba «0 pausas»)
   · MULETILLA: tramo con voz (> p70 − 12 dB) donde Whisper no oyó NINGUNA palabra, ≥ config.filler_min (0,22 s), lejos de una palabra
     del guion que falte (si falta una palabra al lado, puede ser esa palabra mal oída: no se toca)
   · PALABRA FUERA DEL GUION: lo que Whisper oyó y no está en el subtítulo (eh, este, bueno, una palabra repetida), aislado de sus
@@ -65,6 +70,42 @@ holes=[]   # [a, b, tipo, detalle]  en segundos de la línea de tiempo
 # 1 · pausas largas → dejar KEEP de aire en el medio (más los márgenes que agrega edl.py: ≈ 0,2 s en total)
 pauses=runs(lambda i:ENV[i]<=TH_LOW,PAUSE_MAX,0,int(tail_from/HOP))
 for a,b in pauses: holes.append([a+0.02,b-0.02,'pausa',f'{b-a:.2f} s'])   # edl.py vuelve a poner sus márgenes (≈ 0,12 s) al rearmar: queda ≈ 0,2 s de aire
+# 1b · valles: por debajo del habla pero sobre el umbral de pausa (aire, ruido de sala) → solo si Whisper, oyendo ese tramo SOLO, no oye nada
+VALLE_DB=cfg.get('valle_db',7);VALLE_MIN=cfg.get('valle_min',0.40)
+SM=[sum(ENV[max(0,i-2):i+3])/len(ENV[max(0,i-2):i+3]) for i in range(n)]
+HALLU={norm(x) for x in ('Gracias','¡Gracias!','Gracias por ver el video','CC por Antarctica Films Argentina','Subtítulos realizados por la comunidad de Amara.org','Suscríbete al canal','Subtítulos por la comunidad de Amara.org')}
+VACIO={'eh','ehh','ehhh','ehm','em','emm','mm','mmm','mmmm','hmm','hm','ah','ahh','ahhh'}   # sin «y», «a», «o»: en un valle pueden ser palabras de verdad
+CTX=0.8   # contexto a cada lado para la prueba con/sin
+def _oye(f):
+    import subprocess,whisperlib as WL
+    if WL.liviano(W): return WL.text(f,W)
+    cli=os.environ.get('WHISPER_CLI') or __import__('shutil').which('whisper-cli') or os.path.join(os.environ.get('LOCALAPPDATA',''),'whisper-cpp','whisper-cli.exe')
+    return ' '.join(subprocess.run([cli,'-m',os.path.expanduser('~/.cache/whisper-cpp/ggml-large-v3-turbo.bin'),'-f',f,'-l','es','-np','-nt'],capture_output=True,text=True).stdout.split())
+def _palabras(t):
+    t=re.sub(r'\[[^\]]*\]|\([^)]*\)','',t)   # [música], (risas)
+    w=[norm(x) for x in t.split() if norm(x)]
+    return [] if norm(t) in HALLU else [x for x in w if x not in VACIO]
+def _sobra(a,b):
+    """¿El tramo [a,b] del corte es aire? Se transcribe con contexto CON y SIN el tramo: si al sacarlo no se pierde ninguna palabra, sobra.
+    (Whisper sobre el tramo solo no sirve: a una palabra dicha bajito le dice «¿Qué?», y al ruido también: GUION3 «existen» a −25 dB.)"""
+    import subprocess,difflib
+    l0,r1=max(0,a-CTX),min(DUR,b+CTX);cw=os.path.join(W,'cut.wav');f1,f2=os.path.join(W,'t.wav'),os.path.join(W,'t2.wav')
+    subprocess.run(['ffmpeg','-v','error','-y','-ss',f'{l0:.3f}','-to',f'{r1:.3f}','-i',cw,f1])
+    subprocess.run(['ffmpeg','-v','error','-y','-i',cw,'-filter_complex',f'[0]atrim={l0:.3f}:{a:.3f},asetpts=PTS-STARTPTS[x];[0]atrim={b:.3f}:{r1:.3f},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1',f2])
+    t1,t2=_oye(f1),_oye(f2);w1,w2=_palabras(t1),_palabras(t2)
+    perdidas=[x for op,i0,i1,_,_ in difflib.SequenceMatcher(None,w1,w2).get_opcodes() if op in('delete','replace') for x in w1[i0:i1]]
+    return not perdidas,t1,t2,perdidas
+valles=[];VDESC=[]
+try: PROT=json.load(open(os.path.join(W,'aire_protect.json')))   # valles que edl.py devolvió porque al sacarlos align.py dejó de oír una palabra
+except Exception: PROT=[]
+_src=lambda t:(lambda c:c['src_in']/FPS+(t-c['tl_in']/FPS))(clip_at(t))
+for a,b in runs(lambda i:SM[i]<=SP-VALLE_DB,VALLE_MIN,0,int(tail_from/HOP)):
+    if sum(max(0,min(b,pb)-max(a,pa)) for pa,pb in pauses)>=0.8*(b-a): continue   # ya es (casi todo) una pausa
+    sa,sb=_src(a),_src(b-0.001)
+    if any(p0<sb+0.1 and p1>sa-0.1 for p0,p1 in PROT): VDESC.append(f'- valle {a:.2f}s ({b-a:.2f} s) se queda: protegido (sacarlo se comía una palabra según align.py)');continue
+    ok,t1,t2,perd=_sobra(a,b);pk=max(ENV[int(a/HOP):int(b/HOP)] or [-99])
+    if not ok: VDESC.append(f'- valle {a:.2f}s ({b-a:.2f} s, máx {pk:.0f} dB) se queda: sin él se pierde «{" ".join(perd)}» (con: «{t1}» · sin: «{t2}»)');continue
+    valles.append((a,b));holes.append([a+0.02,b-0.02,'pausa',f'valle {b-a:.2f} s · máx {pk:.0f} dB · sin él Whisper oye lo mismo'])
 # 2 · voz sin ninguna palabra (muletilla, risa, chasquido, respiración fuerte)
 for a,b in runs(lambda i:ENV[i]>TH_LOW and not cov[i],FILL_MIN):   # tramo sin palabra por encima del nivel de pausa (incluye la zona gris entre dos «eh»)
     pk=max(ENV[int(a/HOP):int(b/HOP)] or [-99])
@@ -100,9 +141,10 @@ for h in holes:
 holes=merged
 # --- informe ---
 tot=sum(h[1]-h[0] for h in holes)
-md=['# Aire y muletillas',f'nivel de habla (p70) {SP:.0f} dB · pausa ≤ {TH_LOW:.0f} dB · voz > {TH_VOICE:.0f} dB · pausas de ≥ {PAUSE_MAX:.2f} s: {len(pauses)} · huecos: {len(holes)} ({tot:.2f} s)','']
+md=['# Aire y muletillas',f'nivel de habla (p70) {SP:.0f} dB · pausa ≤ {TH_LOW:.0f} dB · valle ≤ {SP-VALLE_DB:.0f} dB (confirmado con Whisper) · voz > {TH_VOICE:.0f} dB · pausas de ≥ {PAUSE_MAX:.2f} s: {len(pauses)} · valles: {len(valles)} · huecos: {len(holes)} ({tot:.2f} s)','']
+if VDESC and not REPORT: md+=['## Valles que se quedan (sacarlos se come una palabra)']+VDESC+['']
 if REPORT:
-    rest_p=[(a,b) for a,b in pauses];rest_f=[h for h in holes if h[2]!='pausa']
+    rest_p=sorted([(a,b) for a,b in pauses]+valles);rest_f=[h for h in holes if h[2]!='pausa']
     md+=['## Lo que queda después de la segunda pasada']+[f'- ⚠️ pausa de {b-a:.2f} s en {a:.2f}s {ctx(a,b)}' for a,b in rest_p]+[f'- ⚠️ {h[2]} en {h[0]:.2f}s ({h[3]}) {ctx(h[0],h[1])}' for h in rest_f]
     if not rest_p and not rest_f: md.append('- sin pausas de ≥ %.2f s ni muletillas detectables ✓'%PAUSE_MAX)
     prev=open(os.path.join(W,'aire.md')).read() if os.path.exists(os.path.join(W,'aire.md')) and '## Lo que queda' not in open(os.path.join(W,'aire.md')).read() else ''
@@ -119,18 +161,31 @@ for cp in E['caps']:
     for wd in cp['words']: caps_pi.setdefault(cp.get('pi'),[]).append(wd)
 pieces=[dict(p,_k=i) for i,p in enumerate(P)]   # _k = índice original (para el texto)
 def split_text(p,s0,s1,c):
-    """Reparte el texto de la frase p: palabras que (según Whisper en el corte) suenan antes del hueco → izquierda."""
-    wds=caps_pi.get(p['_k'],[]);words=p['t'].split()
+    """Reparte el texto de la frase p entre lo que queda antes y después del hueco: cada lado se transcribe SOLO (en el crudo) y las
+    palabras del guion se emparejan con lo oído (WL.assign, como tighten.py). Los tiempos por palabra del corte no sirven para esto:
+    Whisper estira la palabra sobre el silencio y caía del lado equivocado (GUION3: «existen» y «significa» quedaban a la izquierda
+    de un valle que en realidad las precedía, y align.py bloqueaba el corte)."""
+    import subprocess,whisperlib as WL
+    words=p['t'].split();rs=[[p['a'],s0],[s1,p['b']]];hs=[]
+    for a,b in rs:
+        f=os.path.join(W,'t.wav');subprocess.run(['ffmpeg','-v','error','-y','-ss',f'{max(0,a-0.03):.3f}','-to',f'{b+0.03:.3f}','-i',os.path.join(W,'audio16k.wav'),f])
+        hs.append(_oye(f) if b-a>=0.12 else '')
+    ws=[dict(t=t,a=r[0]+0.001) for r,h in zip(rs,hs) for t in h.split()]
+    if ws:
+        l,r=WL.assign(ws,rs,p['t'])
+        if l.split()+r.split()==words: return l,r
+    wds=caps_pi.get(p['_k'],[])   # sin nada oído: por los tiempos del corte, como antes
     if len(wds)!=len(words) or not wds: return None
     left=[wd for wd,x in zip(words,wds) if to_src(x['s']/FPS,c)<(s0+s1)/2]
     return ' '.join(left),' '.join(words[len(left):])
-changed=0
+changed=0;VSRC=[]
 for h0,h1,tipo,det in holes:
     for c in E['clips']:
         ca,cb=c['tl_in']/FPS,c['tl_out']/FPS
         a,b=max(h0,ca),min(h1,cb)
         if b-a<0.04: continue
         s0,s1=to_src(a,c),to_src(b,c)
+        if det.startswith('valle'): VSRC.append([round(s0,3),round(s1,3)])
         md.append(f'| {h0:.2f}s | {h1-h0:.2f} | {tipo} | {det} | {ctx(h0,h1)} | {s0:.2f}–{s1:.2f}s |')
         for pi in c.get('pieces',[]):
             p=next((q for q in pieces if q['_k']==pi and not q.get('_drop')),None)
@@ -174,8 +229,9 @@ for p in pieces:
     if p.get('_drop') or p['b']-p['a']<0.08: continue
     out.append(dict(seg=p['seg'],a=p['a'],b=p['b'],t=p['t'],**{k:p[k] for k in('pre','post') if k in p}))
 open(os.path.join(W,'aire.md'),'w').write('\n'.join(md)+'\n')
+json.dump(VSRC if changed else [],open(os.path.join(W,'aire_valles.json'),'w'))   # edl.py los devuelve si la segunda pasada pierde una palabra al lado
 if not changed:
-    print(f'aire: nada que sacar (pausas de ≥ {PAUSE_MAX:.2f} s: 0 · muletillas: 0 · umbral habla {SP:.0f} dB)');sys.exit(0)
+    print(f'aire: nada que sacar (pausas de ≥ {PAUSE_MAX:.2f} s: 0 · valles: 0 · muletillas: 0 · umbral habla {SP:.0f} dB)');sys.exit(0)
 import shutil;shutil.copy(os.path.join(W,'tight.json'),os.path.join(W,'tight_pre_aire.json'))
 json.dump(out,open(os.path.join(W,'tight.json'),'w'),ensure_ascii=False,indent=1)
 print(f'aire: {len(holes)} hueco(s), {tot:.2f} s sacados ('+' · '.join(f'{t}: {sum(1 for h in holes if h[2]==t)}' for t in dict.fromkeys(h[2] for h in holes))+f') → tight.json ({len(P)} → {len(out)} frases); el corte se vuelve a armar')

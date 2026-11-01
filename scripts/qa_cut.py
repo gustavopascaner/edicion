@@ -34,7 +34,8 @@ for k in range(len(E['clips'])-1):
     tail=seg(to-0.12,to);head=seg(ti,ti+0.12)
     best=max(ncc(tail,head[o:]) if o>=0 else ncc(tail[-o:],head) for o in range(-40,41))   # ±10 ms a 4 kHz
     flags=[]
-    if best>0.9 and max(e_out,e_in)>QUIET: flags.append('DUPLICADO');dup+=1
+    if best>0.9 and max(e_out,e_in)>QUIET+6: flags.append('DUPLICADO');dup+=1
+    elif best>0.9 and max(e_out,e_in)>QUIET: flags.append('parecido en ruido (no bloquea)')   # ruido de sala/zumbido parejo apenas sobre el umbral se parece a sí mismo: falso duplicado (WhatsApp, 31/10/2026, verificado de oído en 2 videos)
     if e_out>QUIET+3 or e_in>QUIET+3: flags.append('voz en el corte');voiced+=1   # +3 dB: a 1–3 dB del umbral es cola de sala / roce, no voz (los empalmes apretados por aire.py quedan ahí)
     rows.append((k,to,e_out,e_in,m_out,m_in,best,flags))
 md=['# QA de empalmes','',f'{cuts} cortes reales · umbral de silencio {QUIET:.0f} dB (piso {FLOOR:.0f}) · {dup} duplicados · {voiced} con voz en el corte','',

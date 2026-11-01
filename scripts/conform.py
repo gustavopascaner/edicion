@@ -70,7 +70,7 @@ chain=''
 fc=(f'[0:v:0]setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase:out_color_matrix=bt709:out_range=tv,crop=1080:1920,setsar=1,'
     f'fps={FPS}:round=near,tpad=stop_mode=clone:stop_duration=2,trim=duration={T:.6f},setpts=PTS-STARTPTS,format=yuv420p[v];'
     f'[0:a:0]{afix}aresample=48000:async=1:first_pts=0,{chain}aformat=sample_fmts=s16:channel_layouts=stereo,apad,atrim=0:{T:.6f},asetpts=PTS-STARTPTS[a]')
-cmd=['ffmpeg','-v','error','-y','-i',SRC,'-filter_complex',fc,'-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','14','-g','15',
+cmd=['ffmpeg','-v','error','-y','-i',SRC,'-filter_complex',fc,'-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','14','-g','15']+(['-threads',os.environ['EDICION_THREADS']] if os.environ.get('EDICION_THREADS') else [])+[
      '-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-video_track_timescale','30000','-c:a','pcm_s16le','-ar','48000','-fps_mode','cfr','-r',str(FPS),OUT]
 print('… conformando el crudo (1 minuto de video tarda ~20-40 s)',flush=True)
 if subprocess.run(cmd).returncode: sys.exit('✗ ffmpeg falló conformando el crudo')

@@ -52,7 +52,7 @@ def tr(a,b,f,prompt=None):
     if WD is not None: return WL.span(WD,a,b)
     subprocess.run(['ffmpeg','-v','error','-y','-ss',str(max(0,a-0.08)),'-to',str(b+0.08),'-i',A,f])
     if LIV: return WL.text(f,W,prompt)
-    cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t',str(min(8,os.cpu_count() or 4)),'-np']
+    cmd=[WHISPER,'-m',MODEL,'-f',f,'-l','es','-otxt','-of',f[:-4],'-t',os.environ.get('EDICION_THREADS') or str(min(8,os.cpu_count() or 4)),'-np']
     if prompt: cmd+=['--prompt',prompt]
     o=f[:-4]+'.txt'
     if os.path.exists(o): os.remove(o)  # no reusar el .txt de una corrida anterior

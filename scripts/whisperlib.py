@@ -16,7 +16,7 @@ WHISPER=os.environ.get('WHISPER_CLI') or shutil.which('whisper-cli') or os.path.
 SERVER=os.environ.get('WHISPER_SERVER') or shutil.which('whisper-server') or os.path.join(LAD,'whisper-server.exe')
 PORT=int(os.environ.get('EDICION_WHISPER_PORT','8178'));URL=f'http://127.0.0.1:{PORT}'
 STATE=os.path.join(CACHE,'server.json')
-THREADS=min(8,os.cpu_count() or 4)
+THREADS=int(os.environ.get('EDICION_THREADS') or min(8,os.cpu_count() or 4))   # EDICION_THREADS: tope de hilos (modo cola, para no saturar la máquina)
 # Whisper remoto (OpenAI vía n8n), obligatorio en el perfil liviano (los scripts del potente no pasan por acá).
 # ~/.config/edicion/whisper_remoto.json {"url": "...", "token": "..."} o EDICION_WHISPER_REMOTO / EDICION_WHISPER_TOKEN.
 def _remote_cfg():

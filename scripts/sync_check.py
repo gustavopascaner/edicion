@@ -29,7 +29,7 @@ fnum=lambda r:(lambda n,d:float(n)/float(d) if float(d) else 0.0)(*(r or '0/1').
 SRC=cfg['src'];cj=os.path.join(W,'conform.json');master=None
 if os.path.exists(cj): master=json.load(open(cj)).get('master')
 if cfg.get('use_parts'): warn.append('config.use_parts: V1/A1 apuntan a los fragmentos originales (sin master): la sincronía depende de que cada fragmento esté limpio')
-elif not master or os.path.abspath(SRC)!=os.path.abspath(master):
+elif not master or __import__('unicodedata').normalize('NFC',os.path.abspath(SRC))!=__import__('unicodedata').normalize('NFC',os.path.abspath(master)):   # macOS: la misma ruta puede venir en NFC o NFD
     (warn if cfg.get('allow_unconformed') else bad).append(f'config.src no es el master conformado ({os.path.basename(SRC)}): correr conform.py y volver a empezar desde la transcripción (el crudo original puede tener fps variable o el audio desplazado)')
 else:
     v=(probe(SRC,'start_time','r_frame_rate','avg_frame_rate','duration',sel='v:0').get('streams') or [{}])[0];a=(probe(SRC,'start_time','duration',sel='a:0').get('streams') or [{}])[0]

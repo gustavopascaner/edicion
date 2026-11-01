@@ -99,7 +99,24 @@ if '--no-verify' not in sys.argv:
     subprocess.run(['ffmpeg','-v','error','-y','-i',os.path.join(W,'audio16k.wav'),'-/filter_complex',os.path.join(W,'fc_cut.txt'),'-map','[out]',cut],check=True)
     print('\n--- verificación del corte (Whisper SIN prompt, tiempos por palabra, clip por clip) ---',flush=True)
     SD=os.path.dirname(os.path.abspath(__file__))
-    if subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'align.py'),W]).returncode: sys.exit(1)
+    rc_al=subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'align.py'),W]).returncode
+    if '--pass2' in sys.argv and sys.argv.count('--retry')<2 and os.path.exists(os.path.join(W,'tight_pre_aire.json')):
+        # valles que sacó aire.py y al lado align.py ya no oye una palabra (habla muy baja que Whisper no oía en la prueba con/sin):
+        # se devuelven (aire_protect.json), tight.json vuelve a como estaba antes de aire.py y se rearma todo
+        try: VS=json.load(open(os.path.join(W,'aire_valles.json')));QW=json.load(open(os.path.join(W,'qa_words.json')))
+        except Exception: VS,QW=[],[]
+        def _cerca(v,t):   # el valle toca el clip donde falta la palabra (el tiempo esperado del subtítulo es aproximado: GUION3 «significa» a 0,76 s)
+            c=next((c for c in clips if c['tl_in']<=t*FPS<c['tl_out']),clips[-1]);s=c['src_in']/FPS+(t-c['tl_in']/FPS)
+            return v[0]-0.5<=s<=v[1]+0.5 or abs(c['src_out']/FPS-v[0])<0.2 or abs(c['src_in']/FPS-v[1])<0.2
+        malos=[v for v in VS if any(_cerca(v,q['t']) for q in QW if q.get('tipo') in('falta','otro_clip','sin_texto'))]
+        if malos:
+            pf=os.path.join(W,'aire_protect.json')
+            try: prot=json.load(open(pf))
+            except Exception: prot=[]
+            json.dump(prot+malos,open(pf,'w'));__import__('shutil').copy(os.path.join(W,'tight_pre_aire.json'),os.path.join(W,'tight.json'))
+            print(f'\n=== {len(malos)} valle(s) sacados se comían una palabra ('+', '.join(f'{a:.2f}–{b:.2f}s del crudo' for a,b in malos)+'): se devuelven y se rearma el corte ===',flush=True)
+            sys.exit(subprocess.run([sys.executable,'-X','utf8','-I',os.path.abspath(__file__),W]+[a for a in sys.argv[2:] if a!='--pass2']+['--retry']).returncode)
+    if rc_al: sys.exit(1)
     if cfg.get('aire',True) and '--no-aire' not in sys.argv:
         if '--pass2' in sys.argv:   # ya es la segunda pasada: solo informar el aire que queda
             print('\n--- aire restante (segunda pasada) ---',flush=True);subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(SD,'aire.py'),W,'--report'])

@@ -133,8 +133,14 @@ for k,c in enumerate(E['clips']):
     heard=[a for a in asr if a.get('clip')==k];okk=[i for i in exp_k if i in match and asr[match[i]].get('clip',k)==k]
     if okk: continue
     sub=' '.join(exp[i][2]['w'] for i in exp_k[:8]);oyo=' '.join(a['t'] for a in heard[:10]);grave=len(exp_k)>=2   # con una sola palabra Whisper puede no oírla: aviso
+    ctx=''
+    if grave and not LIV and (c['tl_out']-c['tl_in'])/FPS<1.5:   # clip corto: Whisper aislado lo oye mal («y observa» → «¿Está bien?», 31/10/2026); se reprueba con ±0,8 s de contexto
+        a,b=c['tl_in']/FPS,c['tl_out']/FPS;a0=max(0,a-0.8)
+        subprocess.run(['ffmpeg','-v','error','-y','-ss',f'{a0:.3f}','-t',f'{b+0.8-a0:.3f}','-i',cut,kw],check=True)
+        got={norm(x['t']) for x in WL.local_words(kw) if a-0.15<=a0+x['a']<=b+0.15}
+        if sum(norm(exp[i][2]['w']) in got for i in exp_k)*2>=len(exp_k): grave=False;ctx=' (con contexto sí se oye: aviso)'
     issues.append(dict(tipo='sin_texto',t=round(c['tl_in']/FPS,2),w=sub,bloquea=grave,
-        msg=f"clip {k} ({tcl(k)}): no se oye su subtítulo «{sub}{'…' if len(exp_k)>8 else ''}»; "+(f"se oye «{oyo}»" if heard else 'no se oye voz (clip de silencio)')+(" → tiempos de segs.json equivocados (check.py)" if grave else " → confirmar con check.py")))
+        msg=f"clip {k} ({tcl(k)}): no se oye su subtítulo «{sub}{'…' if len(exp_k)>8 else ''}»; "+(f"se oye «{oyo}»" if heard else 'no se oye voz (clip de silencio)')+ctx+(" → tiempos de segs.json equivocados (check.py)" if grave else " → confirmar con check.py")))
 run=[]
 for j in sorted(extra)+[None]:   # frases enteras que sobran (≥ 3 palabras seguidas que no están en el guion) = toma repetida o frase que falta en segs.json
     if j is not None and run and j==run[-1]+1: run.append(j);continue

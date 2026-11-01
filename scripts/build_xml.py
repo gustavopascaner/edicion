@@ -172,8 +172,9 @@ if isinstance(M,dict) and M.get('path'):
     nm=('PREVIEW_' if (M.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(MP)
     mtrack=[clip(nid('music'),nm,file_el('f-music',MP,mf,False,True),0,n,off,off+n,mf,lv,srctrack=1)]
     if mf-off<tot: print(f'⚠️  la música dura menos que el video ({(mf-off)/FPS:.1f}s < {tot/FPS:.1f}s)')
-SG=lambda i:[c for c in edl['clips'] if c['seg']==i][0]['tl_in']
-mk=''.join(f'<marker><comment></comment><name>{escape(n)}</name><in>{SG(sg)}</in><out>-1</out></marker>' for n,sg in cfg.get('markers',[]))
+SG=lambda i:next((c['tl_in'] for c in edl['clips'] if c['seg']==i),None) if isinstance(i,int) else None
+_mk=lambda i:SG(i) if SG(i) is not None else min(edl['total']-1,max(0,round(float(i)*FPS)))   # marcador = índice de segmento; si no hay tal segmento se toma como segundos de la línea de tiempo
+mk=''.join(f'<marker><comment></comment><name>{escape(n)}</name><in>{_mk(sg)}</in><out>-1</out></marker>' for n,sg in cfg.get('markers',[]))
 vfmt=f'<format><samplecharacteristics>{RATE}<width>1080</width><height>1920</height><anamorphic>FALSE</anamorphic><pixelaspectratio>square</pixelaspectratio><fielddominance>none</fielddominance><colordepth>24</colordepth></samplecharacteristics></format>'
 afmt='<format><samplecharacteristics><depth>16</depth><samplerate>48000</samplerate></samplecharacteristics></format>'
 seq=(f'<sequence id="seq-1"><name>{NAME}_EDIT_v{VER}</name><duration>{edl["total"]}</duration>{RATE}'

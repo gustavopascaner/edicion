@@ -194,7 +194,7 @@ if(process.argv.includes('--plan')){
 // Escala por clip según la intención: punch = énfasis · snap = zoom rápido de entrada · push = acercamiento lento (preguntas, cierre)
 // tight/wide alternados para disimular los jump cuts (≥ 10 % de diferencia entre clips seguidos).
 // cfg.face.top = alto (0–1) de la parte de arriba de la cabeza en el cuadro: limita el zoom para no cortarla
-const MAXS=cfg.max_zoom||(cfg.face&&cfg.face.top!=null?Math.min(1.3,0.47/(0.5-cfg.face.top)):1.24);
+const MAXS=cfg.max_zoom||(cfg.face&&cfg.face.top!=null?Math.min(1.3,Math.max(1.12,0.47/(0.5-cfg.face.top))):1.24);   // piso 112 %: con la cabeza pegada arriba la fórmula daba < 100 % (bordes negros y jump cuts sin cambio); recortar un poco la frente es preferible
 const MODES={wide:[100,103],push:[100,109],tight:[114,114],punch:[124,124],snap:[100,118],pull:[114,102]};
 const cover=(a,b)=>userJobs.some(j=>j.track==='fs'&&j.start<=a+0.05&&j.end>=b-0.05)||broll.some(x=>x.fx!=='pip'&&x.start<=a+0.05&&x.start+x.dur>=b-0.05);
 const strong=(a,b)=>userJobs.some(j=>/stamp|bigword/.test(j.scene)&&j.start<b&&j.end>a);

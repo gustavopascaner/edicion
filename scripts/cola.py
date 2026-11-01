@@ -199,7 +199,7 @@ def cmd_render(c,args):
         if not ok: continue
         try: E=json.load(open(os.path.join(W,'edl.json')));dur=E['total']/(E.get('fps') or 30)   # total está en fotogramas
         except Exception: dur=0
-        xml=next(iter(glob.glob(os.path.join(v['edit_dir'],'*_premiere.xml'))),'')
+        xml=next(iter(sorted(glob.glob(os.path.join(v['edit_dir'],'*_premiere.xml'))+glob.glob(os.path.join(v['edit_dir'],'*_resolve.xml')))),'')
         nota=f'{dur:.1f} s · {avisos(W)} avisos · render {(time.time()-t0)/60:.1f} min'
         upd(c,n,estado='renderizado',render=R,xml=xml,nota=nota,reintentar=False);res.append(f'✓ {n}: {nota}')
     print('\n'.join(res) if res else 'nada para renderizar (ningún «planificado»)');print();cmd_estado(c)
@@ -269,7 +269,7 @@ def cmd_leeme(c,_=None):
         except Exception: pass
         try: E=json.load(open(os.path.join(W,'edl.json')));dur=E['total']/(E.get('fps') or 30)
         except Exception: dur=0
-        xml=next(iter(sorted(glob.glob(os.path.join(ED,'*_premiere.xml')))),'');srt=next(iter(glob.glob(os.path.join(ED,'*.srt'))),'')
+        xmls=sorted(glob.glob(os.path.join(ED,'*_premiere.xml'))+glob.glob(os.path.join(ED,'*_resolve.xml')));xml=next(iter(xmls),'');srt=next(iter(glob.glob(os.path.join(ED,'*.srt'))),'')
         sync='TODO SINCRONIZADO ✓' if 'TODO SINCRONIZADO' in _rd(os.path.join(W,'cola_render.log'))+_rd(os.path.join(W,'cola_envato.log')) else '⚠️ revisar (no se encontró el resultado de la auditoría)'
         tt=(_rd(os.path.join(W,'timing.md')).splitlines() or [''])[0].strip('* ')
         A=P.get('arte') or {};cta=P.get('cta') or {}
@@ -279,20 +279,22 @@ def cmd_leeme(c,_=None):
         L=[f"# {v['id']} — {P.get('tema','')}",'',
            f"- **Crudo**: {os.path.basename(v['src'])} → master conformado en `Assets/Crudo/`",
            f"- **Duración final**: {dur:.1f} s"+(f" · Reel {P['reel']}" if P.get('reel') else ''),
-           f"- **XML**: `{os.path.basename(xml)}`"+(f" · subtítulos también en `{os.path.basename(srt)}`" if srt else ''),
+           f"- **XML**: "+' · '.join(f'`{os.path.basename(x)}`' for x in xmls)+(f" · subtítulos también en `{os.path.basename(srt)}`" if srt else ''),
            f"- **Sincronía**: {sync}",f"- **{tt}**" if tt else '','',
-           '## Cómo importar','Premiere → Archivo → Importar → el XML de esta carpeta. No mover ni renombrar la carpeta: los assets están enlazados con rutas absolutas. Los empalmes ya llevan un fade de audio de 1 fotograma.','',
+           '## Cómo importar','No mover ni renombrar la carpeta: los assets están enlazados con rutas absolutas.',
+           '- **Premiere**: Archivo → Importar → `*_premiere.xml`. Los empalmes ya llevan un fade de audio de 1 fotograma.',
+           '- **DaVinci Resolve**: `*_resolve.xml`, paso a paso en `IMPORTAR_EN_RESOLVE.md` (proyecto nuevo, Center crop with no resizing, File → Import → Timeline). Los empalmes llevan un crossfade de 2 fotogramas y los SFX y la música van ya procesados en `Assets/Audio_Resolve`.','',
            '## Decisiones',f"- **CTA**: {cta.get('elegido','')}"]
         L+=[f"  - alternativa {a[0]}: {a[1]}" for a in (cta.get('alternativas') or []) if isinstance(a,(list,tuple)) and len(a)>=2]
         L+=['- **Se sacó**: '+('; '.join(P.get('sacado') or []) or '—'),
             f"- **Dirección de arte**: {A.get('arquetipo','')} · héroe {A.get('heroe','')} · concept {A.get('gramatica','')}"+(f" · firma {A.get('firma')}" if A.get('firma') else ''),
             f"- **Música**: {P.get('musica','')}",'','## Material de Envato',env or '—','']
-        if pausas: L+=['## Revisar en Premiere (aire del corte)','Avisos que quedaron después de dos vueltas de corrección; varios son palabras que Whisper no reconoce en clips cortos, no pausas reales:']+[f'- {x[2:] if x.startswith("- ") else x}' for x in pausas]+['']
+        if pausas: L+=['## Revisar en el editor (aire del corte)','Avisos que quedaron después de dos vueltas de corrección; varios son palabras que Whisper no reconoce en clips cortos, no pausas reales:']+[f'- {x[2:] if x.startswith("- ") else x}' for x in pausas]+['']
         if P.get('dudas'): L+=['## Dudas para revisar']+[f'- {d}' for d in P['dudas']]+['']
         if P.get('correcciones'): L+=['## Correcciones hechas durante el lote']+[f'- {d}' if isinstance(d,str) else f'- {json.dumps(d,ensure_ascii=False)}' for d in (P['correcciones'] if isinstance(P['correcciones'],list) else [P['correcciones']])]+['']
         open(os.path.join(ED,'LEEME.md'),'w').write('\n'.join(x for x in L if x is not None)+'\n')
         filas.append(f"| {v['id']} | {os.path.basename(v['src'])[-12:-4]} | {P.get('reel') or ''} | {P.get('tema','')[:60]} | {dur:.1f} s | {'✓' if 'TODO' in sync else '⚠️'} | {'falta licenciar' if 'falta licenciar' in env else 'licenciado'} |")
-    lote=['# Lote Crudos 2 — ediciones independientes','','| Video | Crudo | Reel | Tema | Duración | Sincronía | Envato |','|---|---|---|---|---|---|---|']+filas+['','Cada carpeta `*_EDIT/` tiene su XML para Premiere y su LEEME.md. Estado y retomar: `python3 -I ~/.claude/skills/edicion/scripts/cola.py estado "<esta carpeta>"`.']
+    lote=['# Lote Crudos 2 — ediciones independientes','','| Video | Crudo | Reel | Tema | Duración | Sincronía | Envato |','|---|---|---|---|---|---|---|']+filas+['','Cada carpeta `*_EDIT/` tiene sus XML para Premiere y DaVinci Resolve y su LEEME.md. Estado y retomar: `python3 -I ~/.claude/skills/edicion/scripts/cola.py estado "<esta carpeta>"`.']
     open(os.path.join(os.path.abspath(c),'LEEME_LOTE.md'),'w').write('\n'.join(lote)+'\n');print(f'{len(filas)} LEEME escritos + LEEME_LOTE.md')
 
 if __name__=='__main__':

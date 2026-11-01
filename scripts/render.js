@@ -261,7 +261,9 @@ async function main(){
           await page.evaluate((t)=>frame(t,Math.round(t*30)),t);await page.screenshot({path:path.join(outFor(j),`${j.id}_t${t.toFixed(2)}.png`),omitBackground:true});}
         continue;}
       const outf=path.join(outFor(j),j.id+'.mov');
-      const ff=spawn('ffmpeg',['-v','error','-y','-f','image2pipe','-framerate',String(FPS),'-c:v','png','-i','-','-c:v','qtrle','-pix_fmt','argb',outf]);
+      // ProRes 4444 con alfa: lo leen Premiere y DaVinci Resolve (Mac y Windows); con grano pesa ~1/3 que Animation. config.mg_codec='qtrle' = Animation como antes
+      const VC=cfg.mg_codec==='qtrle'?['-c:v','qtrle','-pix_fmt','argb']:['-c:v','prores_ks','-profile:v','4444','-pix_fmt','yuva444p10le','-alpha_bits','16','-vendor','apl0'];
+      const ff=spawn('ffmpeg',['-v','error','-y','-f','image2pipe','-framerate',String(FPS),'-c:v','png','-i','-',...VC,outf]);
       const done=new Promise(r=>ff.on('close',r));
       for(let f=0;f<nf;f++){await page.evaluate((t,f)=>frame(t,f),f/FPS,f);
         let buf;for(let k=0;;k++){try{buf=await page.screenshot({omitBackground:true,type:'png',optimizeForSpeed:HW.fastShot});break;}catch(e){if(k>=2)throw e;}}  // reintento: en Windows captureScreenshot a veces se cuelga

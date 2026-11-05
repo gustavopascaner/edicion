@@ -263,3 +263,4 @@ _r=subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(os.path.dirname(
 if _r.returncode: sys.exit('✗ La auditoría de sincronía falló: NO entregar este XML hasta resolverlo (ver arriba)')
 print('XML listos:',' · '.join(os.path.basename(o) for o in outs))
 timing.log(W,'XML (Premiere + Resolve)' if len(outs)>1 else 'XML para '+NLE[0].capitalize(),time.time()-T0)
+subprocess.run([sys.executable,'-X','utf8','-I',os.path.join(os.path.dirname(os.path.abspath(__file__)),'reporte.py'),W,'edicion'])   # reporte diario; nunca frena la entrega

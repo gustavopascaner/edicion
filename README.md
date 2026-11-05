@@ -86,3 +86,9 @@ Las tipografías de `engine/fonts` (Bricolage Grotesque, Instrument Serif, Inter
 ## Envato
 
 El MCP público de Envato solo busca, no descarga ni licencia. `scripts/envato.py` lo usa por HTTP, así que no hace falta configurarlo en el agente. Mientras el material no esté licenciado, el XML usa las vistas previas con marca de agua (con el prefijo `PREVIEW_`). Para licenciar, alguien con cuenta de Envato Elements descarga cada ítem desde su link (*Download* → licenciar para el proyecto). Después, `envato.py collect` los toma de `~/Downloads` y actualiza la edición.
+
+## Reporte diario
+
+Al terminar una edición, `scripts/reporte.py` avisa a n8n y a las 20:00 (Buenos Aires) sale el resumen por Gmail. Es automático y nunca frena una entrega: sin internet, el aviso queda en cola y sale con la próxima edición. Usa la URL y el token de `~/.config/edicion/whisper_remoto.json`.
+
+Para elegir el nombre que aparece en el reporte, agregá `"quien": "Tu nombre"` a ese archivo; si no, se usa el usuario de la compu. Para no avisar en una corrida: `EDICION_REPORTE=0`.

@@ -621,11 +621,12 @@ function capStyled(p,CS){
  const gs=p.groups.map(g=>{const box=h('div',`position:absolute;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:${st==='minimal'?'0 16px':'4px 20px'};text-align:center${st==='karaoke'&&!ink?';filter:drop-shadow(0 5px 0 rgba(0,0,0,.5)) drop-shadow(0 0 22px rgba(0,0,0,.35))':''}`,w);
   g.els=g.words.map(x=>{const ser=st==='minimal'&&x.k;
    const s=h('span',`font-family:${ser?'Serif':fam};font-weight:${ser?400:fam==='Inter'?700:800};${fam==='Brico'&&!ser?'font-stretch:80%;':''}font-style:${ser||fam==='Serif'?'italic':'normal'};font-size:${ser?size*1.3:size}px;line-height:1.05;text-transform:${up&&!ser?'uppercase':'none'};letter-spacing:-.01em;color:${base};display:inline-block;position:relative;padding:0 ${st==='box'?12:4}px;border-radius:14px;text-shadow:${st==='karaoke'?'none':SH}`,box,x.w);
+   if(x.big){Object.assign(s.style,{fontFamily:'Brico',fontWeight:800,fontStretch:'80%',fontStyle:'normal',textTransform:'uppercase',letterSpacing:'.01em',fontSize:Math.round(size*(st==='minimal'?1.55:1.3))+'px'});s._big=1;}   // config.caption_strong: énfasis fuerte
    if(st==='underline')s._u=h('div',`position:absolute;left:4px;right:4px;bottom:-2px;height:12px;border-radius:6px;transform-origin:left;transform:scaleX(0);background:${ACT};box-shadow:${ink?'none':'0 4px 0 rgba(0,0,0,.4)'}`,s);
    return s;});
   if(st==='stacked'){const k=Math.max(1,Math.ceil(g.words.length*.45));box.style.flexDirection='column';box.style.alignItems='center';box.style.gap='0';
    const ln=[0,1].map(()=>h('div','display:flex;flex-wrap:nowrap;gap:0 18px;justify-content:center;align-items:baseline',box));
-   g.els.forEach((e,i)=>{ln[i<k?0:1].appendChild(e);e.style.fontSize=(i<k?size*.78:size*1.4)+'px';});
+   g.els.forEach((e,i)=>{ln[i<k?0:1].appendChild(e);e.style.fontSize=(i<k?size*.78:size*1.4)*(e._big?1.25:1)+'px';});
    ln.forEach(l=>{const wd=l.scrollWidth;if(wd>940)[...l.children].forEach(e=>e.style.fontSize=parseFloat(e.style.fontSize)*940/wd+'px');});}
   g.box=box;return g;});
  return t=>{gs.forEach(g=>{const on=t>=g.s&&t<g.e;g.box.style.display=on?'flex':'none';if(!on)return;
@@ -638,7 +639,8 @@ function capStyled(p,CS){
    else if(st==='karaoke'){const q=act?P(t,wd.s,Math.max(.08,wd.e-wd.s)):0,dim=kw?KW:base,fill=ac;   // la palabra activa se va llenando con el acento
     el.style.background=`linear-gradient(90deg,${fill} ${q*100}%,${dim} ${q*100}%)`;el.style.webkitBackgroundClip='text';el.style.backgroundClip='text';el.style.color='transparent';}
    else if(st==='minimal'){el.style.color=act?ac:(kw?KW:base);el.style.opacity=act||past?1:.85;}
-   else{el.style.color=act?ac:(kw?KW:base);el.style.transform=act?'scale(1.05)':'none';}});});};
+   else{el.style.color=act?ac:(kw?KW:base);el.style.transform=act?'scale(1.05)':'none';}
+   if(el._big&&st!=='box'&&st!=='karaoke')el.style.color=p.onHot?'var(--paper)':'var(--hot)';});});};   // énfasis fuerte: siempre en el acento de la marca
 }
 SC.cap=p=>{
  const CS=Object.assign({style:'box'},window.CAPSTYLE||{});
@@ -646,7 +648,7 @@ SC.cap=p=>{
  // p.groups:[{s,e,words:[{w,s,e}]}] times in seconds local
  const w=h('div',`position:absolute;left:70px;right:70px;top:${p.y??1230}px;display:flex;justify-content:center`);   // p.y: lo decide layout.js para no pisar la cara
  const gs=p.groups.map(g=>{const box=h('div','position:absolute;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;text-align:center',w);
-  g.els=g.words.map(x=>{const s=h('span','font-family:Brico;font-weight:800;font-stretch:80%;font-size:92px;line-height:1.02;text-transform:uppercase;letter-spacing:-.01em;color:#fff;padding:0 12px;border-radius:14px;-webkit-text-stroke:0;text-shadow:0 6px 0 rgba(0,0,0,.55),0 0 30px rgba(0,0,0,.35);display:inline-block',box,x.w);return s;});
+  g.els=g.words.map(x=>{const s=h('span','font-family:Brico;font-weight:800;font-stretch:80%;font-size:92px;line-height:1.02;text-transform:uppercase;letter-spacing:-.01em;color:#fff;padding:0 12px;border-radius:14px;-webkit-text-stroke:0;text-shadow:0 6px 0 rgba(0,0,0,.55),0 0 30px rgba(0,0,0,.35);display:inline-block',box,x.w);if(x.big)s.style.fontSize='120px';return s;});
   g.box=box;return g;});
  return t=>{gs.forEach(g=>{const on=t>=g.s&&t<g.e;g.box.style.display=on?'flex':'none';if(!on)return;
   const x=E.back(P(t,g.s,.22));g.box.style.transform=`translateY(${(1-x)*24}px) scale(${L(.9,1,x)})`;

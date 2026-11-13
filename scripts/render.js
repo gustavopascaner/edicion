@@ -73,24 +73,30 @@ for(const b of broll){if(!b.fx||b.fx==='push')continue;const m=(cfg.broll||{})[b
 const userJobs=jobs.slice();
 // subtítulos: un clip por clip de V1
 const KW=new Set((cfg.keywords||[]).map(norm));
+// Signos: los subtítulos conservan ¿ y ? (pedido del cliente de Ciro, 01/11/2026); config.caption_punct:false los saca como antes. Siempre se sacan «:» y la coma final
+// config.caption_strong: palabras con énfasis fuerte (MAYÚSCULAS, tipografía de títulos, más grandes y en el color de palabra clave), p. ej. ["plena","potente","potentes"]
+const STRONG=new Set((cfg.caption_strong||[]).map(norm));
+const capw=w=>(cfg.caption_punct===false?w.replace(/[¿?:]/g,''):w.replace(/:/g,'')).replace(/,$/,'');
+const capk=w=>STRONG.has(norm(w))?{k:true,big:true}:{k:KW.has(norm(w))};
 // Los subtítulos corren todo el tiempo, PERO desaparecen mientras hay un motion graphic (ov, ov2 o pantalla completa):
 // las palabras que caen dentro de un MG no se muestran (el MG ya cuenta esa idea) y vuelven apenas sale.
-const MGW0=userJobs.filter(j=>j.track!=='cap').map(j=>[j.start-0.08,j.end+0.1]),MGW=[...MGW0,...FXW];   // FXW: b-roll con marco (los subtítulos van adentro del marco)
-const inMG=(a,b)=>MGW.some(([x,y])=>a<y&&b>x),nextMG=t=>Math.min(...MGW.filter(([x])=>x>=t).map(([x])=>x),1e9);
+const MGW0=userJobs.filter(j=>j.track!=='cap').map(j=>[j.start-0.08,j.end+0.1,j.end]),MGW=[...MGW0,...FXW];   // [desde, hasta, fin real del MG]   // FXW: b-roll con marco (los subtítulos van adentro del marco)
+// una palabra que arranca cuando el MG ya salió se muestra (antes el margen de 0,1 s ocultaba el «¿Realmente» del 162608)
+const inMG=(a,b)=>MGW.some(([x,y,z])=>a<y&&b>x&&a<(z??y)),nextMG=t=>Math.min(...MGW.filter(([x])=>x>=t).map(([x])=>x),1e9);
 let capHidden=0;
 edl.clips.forEach((c,i)=>{const s=c.tl_in/FPS,e=c.tl_out/FPS,groups=[];
   for(const g of edl.caps.filter(g=>g.clip===i)){
-    const ws=g.words.map(w=>({w:w.w.replace(/[¿?:]/g,'').replace(/,$/,''),gs:w.s/FPS,ge:w.e/FPS,k:KW.has(norm(w.w))}));let run=[];
+    const ws=g.words.map(w=>({w:capw(w.w),gs:w.s/FPS,ge:w.e/FPS,...capk(w.w)}));let run=[];
     const flush=(last)=>{if(!run.length)return;const a=run[0]===ws[0]?g.tl_in/FPS:run[0].gs;
       const b=Math.min(last?g.tl_out/FPS:run[run.length-1].ge+0.12,nextMG(run[0].gs));
-      groups.push({s:R(s,a),e:R(s,b),words:run.map(w=>({w:w.w,s:R(s,w.gs),e:R(s,w.ge),k:w.k}))});run=[];};
+      groups.push({s:R(s,a),e:R(s,b),words:run.map(w=>({w:w.w,s:R(s,w.gs),e:R(s,w.ge),k:w.k,big:w.big}))});run=[];};
     ws.forEach((w,k)=>{if(inMG(w.gs,w.ge)){flush(false);capHidden++;}else run.push(w);});flush(true);}
   if(groups.length)J(`cap_${String(i).padStart(2,'0')}`,'cap','cap',s,e,{groups,y:LAY.capTop});});
 if(capHidden)console.log(`subtítulos: ${capHidden} palabras ocultas bajo motion graphics`);
 // marcos de b-roll: un MG por b-roll tratado (pista de subtítulos = justo encima del b-roll y debajo de stickers/tarjetas), con los subtítulos de ese tramo adentro
 broll.filter(b=>b.box).forEach((b,k)=>{const a=b.start,e=b.start+b.dur,caps=[];
   if(b.fx!=='pip')for(const g of edl.caps){const ws=g.words.filter(w=>w.s/FPS>=a-0.02&&w.s/FPS<e-0.1&&!MGW0.some(([x,y])=>w.s/FPS<y&&w.e/FPS>x));if(!ws.length)continue;
-    caps.push({s:R(a,Math.max(a,ws[0].s/FPS)),e:R(a,Math.min(e,g.tl_out/FPS,ws[ws.length-1].e/FPS+0.12)),words:ws.map(w=>({w:w.w.replace(/[¿?:]/g,'').replace(/,$/,''),s:R(a,w.s/FPS),e:R(a,w.e/FPS),k:KW.has(norm(w.w))}))});}
+    caps.push({s:R(a,Math.max(a,ws[0].s/FPS)),e:R(a,Math.min(e,g.tl_out/FPS,ws[ws.length-1].e/FPS+0.12)),words:ws.map(w=>({w:capw(w.w),s:R(a,w.s/FPS),e:R(a,w.e/FPS),...capk(w.w)}))});}
   J(`bx_${String(k+1).padStart(2,'0')}_${b.src}`,'bframe','cap',a,e,{kind:b.fx,box:b.box,bg:b.bg,label:b.label,caps,capY:b.capY??LAY.capTop,_bx:true,free:true},null);});
 // Límites: 2–4 pantallas completas (cfg.fs_max, default 4) y como máximo cfg.mg_max (default 3) motion graphics superpuestos (ov/ov2)
 {const nFs=userJobs.filter(j=>j.track==='fs').length,nOv=userJobs.filter(j=>j.track==='ov'||j.track==='ov2').length;

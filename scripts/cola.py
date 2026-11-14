@@ -291,6 +291,7 @@ def _rd(p,default=''):
     except OSError: return default
 
 def cmd_leeme(c,_=None):
+    print('LEEME desactivado (pedido de Gus 13/11/2026): no se escribe LEEME.md');return
     q=load(c);filas=[]
     for v in q['videos']:
         if v['estado']!='renderizado': continue

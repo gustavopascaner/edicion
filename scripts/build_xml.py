@@ -2,7 +2,7 @@
 """Paso 6: XML FCP7 (xmeml v4) para Premiere y para DaVinci Resolve. uso: python3 -I build_xml.py <workdir>
 Pistas: V1 video (alterna push-in 100→106% / punch-in 118%) · V2 b-roll · V3 subtítulos · V4 ov · V5 ov2 · V6 fs
         A1 diálogo · A2+ SFX/música.  Todo con rutas absolutas (file://localhost/...).
-config.nle = ["premiere","resolve"] (default: los dos) → <NAME>_v<N>_premiere.xml y <NAME>_v<N>_resolve.xml
+config.nle = ["resolve"] (default; ["premiere","resolve"] para sumar Premiere) → <NAME>_v<N>_resolve.xml
 Resolve no lee bien los keyframes de Audio Levels ni los timebase fraccionarios (23.976): su XML lleva
   · SFX y música YA procesados (recorte, nivel y fades grabados en Assets/Audio_Resolve/*.wav, a nivel 1.0)
   · voz: crossfade de 2 fotogramas en cada corte real (en vez del fade de 1 fotograma por keyframes)
@@ -17,7 +17,7 @@ W=sys.argv[1];cfg=json.load(open(os.path.join(W,'config.json')))
 _pend=[k for k,b in list((cfg.get('broll') or {}).items())+[('music',cfg.get('music'))] if isinstance(b,dict) and not b.get('path') and b.get('envato')]
 if _pend: sys.exit(f"⚠️  Envato sin descargar: {', '.join(_pend)} → licenciar/descargar y correr envato.py collect (o use --preview)")
 EDIT=cfg['edit_dir'];SRC=cfg['src'];FPS=cfg.get('fps',30);NAME=cfg['name'];VER=cfg.get('version',1)
-NLE=cfg.get('nle') or ['premiere','resolve'];NLE=[NLE] if isinstance(NLE,str) else NLE
+NLE=cfg.get('nle') or ['resolve'];NLE=[NLE] if isinstance(NLE,str) else NLE
 edl=json.load(open(os.path.join(W,'edl.json')));jobs=json.load(open(os.path.join(W,'jobs.json')));br=json.load(open(os.path.join(W,'broll.json')))
 RATE=f'<rate><timebase>{FPS}</timebase><ntsc>FALSE</ntsc></rate>'
 RES=False   # True mientras se arma el XML de Resolve
@@ -252,8 +252,6 @@ for nle in ('premiere','resolve'):
     xml.dom.minidom.parse(out)   # valida que el XML esté bien formado
     outs.append(out);print(f'XML {nle}:',out,'· pistas de video',info['vt'],'· pistas SFX',info['st'],'· duración %.1fs'%(edl['total']/FPS)
         +(f" · voz: {info['xf'][0]} crossfades de 2 fotogramas"+(f", {info['xf'][1]} cortes sin crossfade (voz en la cola)" if info['xf'][1] else '') if RES else ''))
-if 'resolve' in NLE:
-    shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','reference','importar_resolve.md'),os.path.join(EDIT,'IMPORTAR_EN_RESOLVE.md'))
 # SRT para subtítulos nativos
 def tc(f):
     ms=round(f/FPS*1000);return f'{ms//3600000:02d}:{ms//60000%60:02d}:{ms//1000%60:02d},{ms%1000:03d}'

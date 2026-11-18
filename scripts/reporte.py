@@ -22,14 +22,33 @@ def duracion(W,c,tipo):
         r=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',mp4],capture_output=True,text=True,timeout=20)
         return round(float(r.stdout.strip()),1)
     except Exception: return 0
+PAUSA=30*60  # un hueco sin scripts ni etapas más largo que esto es tiempo parado (noche, otra tarea), no edición
+def activo(W,st,now):
+    """Tiempo trabajando, no de reloj: suma lo que corrió un script y los tramos entre actividades,
+    salvo huecos de más de PAUSA y las esperas al usuario (timing.py espera)."""
+    pasos=(leer(os.path.join(W,'timing.json'),{}) or {}).get('steps') or []
+    tools=[(x['at']-x['secs'],x['at']) for x in pasos if x.get('at',0)>=st]
+    ms=[]
+    try:
+        with open(os.path.join(W,'timing_fases.jsonl'),encoding='utf-8') as f: ms=sorted((json.loads(l) for l in f if l.strip()),key=lambda m:m['at'])
+    except Exception: pass
+    ms=[m for m in ms if st<=m['at']<=now]
+    esperas=[(m['at'],ms[i+1]['at'] if i+1<len(ms) else now) for i,m in enumerate(ms) if m.get('kind')=='espera']
+    puntos=sorted({st,now,*(m['at'] for m in ms),*(t for a,b in tools for t in (a,b) if st<=t<=now)})
+    dentro=lambda t,iv:any(a<=t<=b for a,b in iv)
+    tot=0
+    for a,b in zip(puntos,puntos[1:]):
+        m=(a+b)/2
+        if dentro(m,tools) or (b-a<=PAUSA and not dentro(m,esperas)): tot+=b-a
+    return round(tot)
 def proceso(W):
     """Tiempo de la primera vez que se terminó: rearmar el XML días después (originales de Envato) no lo infla."""
     st=(leer(os.path.join(W,'timing.json'),{}) or {}).get('start') or 0
     p=os.path.join(W,'reporte.json');g=leer(p,{}) or {}
-    if st and g.get('start')==st: return st,g.get('secs',0)
-    secs=round(time.time()-st) if st else 0
+    if st and g.get('start')==st and g.get('activo'): return st,g.get('secs',0)
+    secs=activo(W,st,time.time()) if st else 0
     try:
-        with open(p,'w',encoding='utf-8') as f: json.dump({'start':st,'secs':secs},f)
+        with open(p,'w',encoding='utf-8') as f: json.dump({'start':st,'secs':secs,'activo':1},f)
     except Exception: pass
     return st,secs
 def datos(W,tipo,r):

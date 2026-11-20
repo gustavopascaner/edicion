@@ -31,9 +31,12 @@ for b in br['broll']:
         fc.append(f"[{k}:v]trim=start={b['sin']}:duration={b['dur']},setpts=PTS-STARTPTS,fps={FPS},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,setpts=PTS+{fr(b['start'])}/{FPS}/TB[o{k}]")
     fc.append(f"[{last}][o{k}]overlay=eof_action=pass[m{k}]");last=f'm{k}';k+=1
 order={'cap':0,'ov':1,'ov2':2,'fs':3}
+try: BANDS=json.load(open(os.path.join(W,'cap_bands.json')))
+except Exception: BANDS={}
 for j in sorted(jobs,key=lambda j:(order[j['track']],j['start'])):
     inputs+=['-i',os.path.join(EDIT,'Assets','Subtitulos' if j['track']=='cap' else 'MG',j['id']+'.mov')]
-    fc.append(f"[{k}:v]setpts=PTS+{fr(j['start'])}/{FPS}/TB[o{k}]");fc.append(f"[{last}][o{k}]overlay=eof_action=pass:format=auto[m{k}]");last=f'm{k}';k+=1
+    y=(BANDS.get(j['id']) or [0])[0] if j['track']=='cap' else 0   # subtítulos recortados: la franja va a su altura
+    fc.append(f"[{k}:v]setpts=PTS+{fr(j['start'])}/{FPS}/TB[o{k}]");fc.append(f"[{last}][o{k}]overlay=x=0:y={y}:eof_action=pass:format=auto[m{k}]");last=f'm{k}';k+=1
 LIB=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','assets','sfx');sl=[]
 sfx=json.load(open(os.path.join(W,'sfx.json'))) if os.path.exists(os.path.join(W,'sfx.json')) else []
 for x in sfx:

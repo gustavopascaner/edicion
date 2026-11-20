@@ -258,9 +258,16 @@ const GLOBAL_KEY=sha(JSON.stringify({v:1,FPS,codec:cfg.mg_codec||'prores4444',en
   brandjs:srcSig(path.join(__dirname,'brand.js')),BR,brFiles:refSigs(BR||{}),LAY,CAPSTYLE,capcol:cfg.caption_colors||(BR?BRAND.captionColors(BR):null)}));
 const ILU_KEY=srcSig(ILU_JS),CONCEPT_KEY=srcSig(CONCEPT_JS),LEGACY_KEY=LEGACY?srcSig(path.join(__dirname,'..','reference','concept_ejemplos.js')):null;
 const jobKey=j=>sha(JSON.stringify({g:GLOBAL_KEY,scene:j.scene,p:j.p,nf:Math.round((j.end-j.start)*FPS),
-  ilu:/^(ilu|concept)$/.test(j.scene)?ILU_KEY:null,concept:j.scene==='concept'?[CONCEPT_KEY,LEGACY_KEY]:null,refs:refSigs(j.p)}));
+  crop:j.scene==='cap'&&CROP,ilu:/^(ilu|concept)$/.test(j.scene)?ILU_KEY:null,concept:j.scene==='concept'?[CONCEPT_KEY,LEGACY_KEY]:null,refs:refSigs(j.p)}));
 let CACHE={};try{CACHE=JSON.parse(fs.readFileSync(CACHE_F,'utf8'));}catch(e){}
 const saveCache=()=>{try{fs.writeFileSync(CACHE_F,JSON.stringify(CACHE,null,1));}catch(e){console.warn('render_cache: no se pudo guardar ('+e.message+')');}};
+// Subtítulos recortados: cada job de subtítulos (escena 'cap') se captura y codifica solo en la franja que ocupa (1080×~400 en vez de 1080×1920:
+// ~4× menos píxeles); build_xml.py y preview.py lo ubican en su lugar con <work>/cap_bands.json {id:[y,alto]}. config.caption_crop:false = pantalla completa
+const CROP=cfg.caption_crop!==false,BANDS_F=path.join(WD,'cap_bands.json');let BANDS={};try{BANDS=JSON.parse(fs.readFileSync(BANDS_F,'utf8'));}catch(e){}
+const saveBands=()=>{try{fs.writeFileSync(BANDS_F,JSON.stringify(BANDS,null,1));}catch(e){console.warn('cap_bands: no se pudo guardar ('+e.message+')');}};
+// Chrome sin esperar el refresco de pantalla: cada captura esperaba ~40 ms al vsync y las pestañas hacían fila (subtítulos 45 s → 9 s en la Mac,
+// mismos fotogramas). NO agregar --disable-gpu: cambia el dibujo de algunos MG. EDICION_RENDER_VSYNC=1 = como antes
+const VSYNC=process.env.EDICION_RENDER_VSYNC==='1'?[]:['--disable-gpu-vsync','--disable-frame-rate-limit'];
 async function main(){
   if(!CHROME)throw new Error('No encuentro Chrome. Instalalo o definí CHROME=/ruta/al/ejecutable');
   const only=process.argv.find(a=>a.startsWith('--only='));const test=process.argv.includes('--test');
@@ -272,11 +279,11 @@ async function main(){
   const outFor=j=>test?path.join(WD,'test'):path.join(A,j.track==='cap'?'Subtitulos':'MG');
   [path.join(A,'MG'),path.join(A,'Subtitulos'),path.join(WD,'test')].forEach(d=>fs.mkdirSync(d,{recursive:true}));
   if(!test){const same=[];list=list.filter(j=>{j._key=jobKey(j);const f=path.join(outFor(j),j.id+'.mov');
-      const ok=!FORCE&&CACHE[j.id]===j._key&&fs.existsSync(f)&&fs.statSync(f).size>0;if(ok)same.push(j.id);return !ok;});
+      const ok=!FORCE&&CACHE[j.id]===j._key&&fs.existsSync(f)&&fs.statSync(f).size>0&&!(CROP&&j.scene==='cap'&&!(j.id in BANDS));   /* sin su franja anotada, el subtítulo recortado no se podría ubicar */if(ok)same.push(j.id);return !ok;});
     if(same.length)console.log(`sin cambios (no se renderizan): ${same.length} · ${same.join(' ')}`);
     console.log(`a renderizar: ${list.length}`+(list.length?' · '+list.map(j=>j.id).join(' '):''));
     if(!list.length)return;}
-  const browser=await puppeteer.launch({executablePath:CHROME,headless:true,protocolTimeout:HW.protocolTimeout,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
+  const browser=await puppeteer.launch({executablePath:CHROME,headless:true,protocolTimeout:HW.protocolTimeout,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars',...VSYNC]});
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
     await page.goto(fileURL(path.join(ENG,'engine.html')));{const k=await BRAND.apply(page,BR);if(k&&k<.98&&!FIT_SAID){FIT_SAID=1;console.log(`marca: la tipografía de títulos es más ancha que la del motor → títulos al ${Math.round(k*100)} %`);}}await page.evaluate(()=>document.fonts.ready);
@@ -295,16 +302,23 @@ async function main(){
         continue;}
       const outf=path.join(outFor(j),j.id+'.mov');
       if(CACHE[j.id]){delete CACHE[j.id];saveCache();}   // si el render se corta a mitad, el .mov a medias no queda marcado como vigente
+      if(j.id in BANDS){delete BANDS[j.id];saveBands();}
+      // franja del subtítulo: recorre todos los fotogramas midiendo la caja de lo visible (barato: sin captura) + margen para sombras y acentos
+      let clip=null;if(CROP&&j.scene==='cap'){const b=await page.evaluate((nf,FPS)=>{let a=1e9,z=-1e9;const S=document.getElementById('stage');
+          for(let f=0;f<nf;f++){frame(f/FPS,f);for(const e of S.querySelectorAll('*')){const r=e.getBoundingClientRect();if(r.width<1||r.height<1)continue;if(r.top<a)a=r.top;if(r.bottom>z)z=r.bottom;}}
+          return z>a?[a,z]:null;},nf,FPS);
+        if(b){let y0=Math.max(0,Math.floor(b[0]-56)),y1=Math.min(1920,Math.ceil(b[1]+56));y0-=y0%2;let hh=y1-y0;hh+=hh%2;if(y0+hh>1920)y0=1920-hh;
+          if(hh<1400)clip={x:0,y:y0,width:1080,height:hh};}}
       // ProRes 4444 con alfa: lo leen Premiere y DaVinci Resolve (Mac y Windows); con grano pesa ~1/3 que Animation. config.mg_codec='qtrle' = Animation como antes
       const VC=cfg.mg_codec==='qtrle'?['-c:v','qtrle','-pix_fmt','argb']:['-c:v','prores_ks','-profile:v','4444','-pix_fmt','yuva444p10le','-alpha_bits','16','-vendor','apl0'];
       const ff=spawn('ffmpeg',['-v','error','-y','-f','image2pipe','-framerate',String(FPS),'-c:v','png','-i','-',...VC,outf]);
       const done=new Promise(r=>ff.on('close',r));
       for(let f=0;f<nf;f++){await page.evaluate((t,f)=>frame(t,f),f/FPS,f);
-        let buf;for(let k=0;;k++){try{buf=await page.screenshot({omitBackground:true,type:'png',optimizeForSpeed:HW.fastShot});break;}catch(e){if(k>=2)throw e;}}  // reintento: en Windows captureScreenshot a veces se cuelga
+        let buf;for(let k=0;;k++){try{buf=await page.screenshot({omitBackground:true,type:'png',optimizeForSpeed:HW.fastShot,...(clip?{clip}:{})});break;}catch(e){if(k>=2)throw e;}}  // reintento: en Windows captureScreenshot a veces se cuelga
         if(!ff.stdin.write(buf))await new Promise(r=>ff.stdin.once('drain',r));}
       ff.stdin.end();const code=await done;
       if(code!==0){delete CACHE[j.id];saveCache();console.log('ERR',j.id,`ffmpeg terminó con código ${code}`);continue;}
-      CACHE[j.id]=j._key;saveCache();console.log('ok',j.id,nf+'f');}
+      CACHE[j.id]=j._key;saveCache();if(CROP&&j.scene==='cap'){BANDS[j.id]=clip?[clip.y,clip.height]:null;saveBands();}   /* null = quedó a pantalla completa */console.log('ok',j.id,nf+'f'+(clip?` · franja ${clip.height}px`:''));}
     await page.close();}
   await Promise.all(Array.from({length:par},worker));await browser.close();
 }

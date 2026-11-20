@@ -174,6 +174,12 @@ def build():
             kv=b.get('kb') if b.get('fx') else None   # Ken Burns en video solo con fx ('push' o marcos): los proyectos viejos quedan igual
             v2.append(clip(nid('broll'),('PREVIEW_' if (m.get('envato') or {}).get('status')=='preview' else '')+os.path.basename(p),file_el('f-'+b['src'],p,nf,True,False,m['w'],m['h'],rate=r),s,s+n,cin,cin+n,round(nf*FPS/r),
                            mo(round(sc*kv[0]/100,1),[(cin,round(sc*kv[0]/100,1)),(cin+n,round(sc*kv[1]/100,1))]) if kv else mo(sc)))
+    # subtítulos recortados (render.js → cap_bands.json {id:[y,alto]}): el .mov mide 1080×alto y se ubica con Basic Motion (escala 100 + centro)
+    try: BANDS=json.load(open(os.path.join(W,'cap_bands.json')))
+    except Exception: BANDS={}
+    def band_fx(j):
+        y,hh=BANDS[j['id']]
+        return motion(100).replace('</effect></filter>',f'<parameter authoringApp="PremierePro"><parameterid>center</parameterid><name>Center</name><value><horiz>0</horiz><vert>{round((y+hh/2-960)/1920,4)}</vert></value></parameter></effect></filter>')
     def place(flt,folder):
         tracks=[]
         for j in sorted([j for j in jobs if flt(j)],key=lambda j:j['start']):
@@ -181,7 +187,8 @@ def build():
             for t in tracks:
                 if t['end']<=s: break
             else: t={'end':0,'items':[]};tracks.append(t)
-            t['items'].append(clip(nid('mg'),j['id'],file_el('f-'+j['id'],path,n),s,e,0,n,n));t['end']=e
+            bd=folder=='Subtitulos' and bool(BANDS.get(j['id'])) and os.path.exists(path)
+            t['items'].append(clip(nid('mg'),j['id'],file_el('f-'+j['id'],path,n,h=BANDS[j['id']][1] if bd else 1920),s,e,0,n,n,band_fx(j) if bd else ''));t['end']=e
         return [t['items'] for t in tracks]
     vtracks=[v1]+([v2] if v2 else [])+place(lambda j:j['track']=='cap','Subtitulos')+place(lambda j:j['track']=='ov','MG')+place(lambda j:j['track']=='ov2','MG')+place(lambda j:j['track']=='fs','MG')
     st=[]

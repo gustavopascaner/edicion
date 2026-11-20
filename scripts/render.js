@@ -239,6 +239,28 @@ if(jobs.some(j=>j.scene==='concept')){
 // Se carga ANTES de concept.js, así el concept puede reusar las figuras de window.FIG (el objeto héroe reaparece).
 const ILU_JS=path.join(WD,'ilustra.js');
 if(jobs.some(j=>j.scene==='ilu')&&!fs.existsSync(ILU_JS))console.warn(`⚠️  Falta ${ILU_JS}: las ilustraciones (escena "ilu") se dibujan desde cero para cada video (window.ILU={fig:(g,p,a,D,r)=>…}).`);
+// ───── CACHÉ DE RENDER: solo se renderiza lo que cambió ─────
+// Cada .mov guarda en <work>/render_cache.json una huella de todo lo que define sus cuadros: escena, parámetros, duración,
+// motor (engine.html + fuentes), marca, ubicación de la cara, estilo y colores de subtítulos, códec, y ilustra.js/concept.js
+// si la escena los usa (más fecha y tamaño de cualquier archivo que nombren los parámetros). Si la huella coincide y el .mov está,
+// no se vuelve a renderizar. --force (o EDICION_RENDER_FORCE=1) renderiza todo igual.
+const crypto=require('crypto');
+const sha=s=>crypto.createHash('sha1').update(s).digest('hex');
+const fileSig=p=>{try{const st=fs.statSync(p);return st.isFile()?`${st.size}:${Math.round(st.mtimeMs)}`:null;}catch(e){return null;}};
+const srcSig=p=>{try{return sha(fs.readFileSync(p));}catch(e){return null;}};
+function refSigs(o,acc={}){   // archivos que nombran los parámetros (imágenes, logos…): si cambian, la huella cambia
+  if(typeof o==='string'){if(o.length<600&&/[\\/]/.test(o)&&/\.[a-z0-9]{2,5}$/i.test(o)){const s=fileSig(o);if(s)acc[o]=s;}}
+  else if(Array.isArray(o))o.forEach(x=>refSigs(x,acc));else if(o&&typeof o==='object')Object.values(o).forEach(x=>refSigs(x,acc));return acc;}
+const CACHE_F=path.join(WD,'render_cache.json');
+const FORCE=process.argv.includes('--force')||process.env.EDICION_RENDER_FORCE==='1';
+const GLOBAL_KEY=sha(JSON.stringify({v:1,FPS,codec:cfg.mg_codec||'prores4444',engine:srcSig(path.join(ENG,'engine.html')),
+  fonts:fs.existsSync(path.join(ENG,'fonts'))?fs.readdirSync(path.join(ENG,'fonts')).sort().map(f=>f+'='+fileSig(path.join(ENG,'fonts',f))):[],
+  brandjs:srcSig(path.join(__dirname,'brand.js')),BR,brFiles:refSigs(BR||{}),LAY,CAPSTYLE,capcol:cfg.caption_colors||(BR?BRAND.captionColors(BR):null)}));
+const ILU_KEY=srcSig(ILU_JS),CONCEPT_KEY=srcSig(CONCEPT_JS),LEGACY_KEY=LEGACY?srcSig(path.join(__dirname,'..','reference','concept_ejemplos.js')):null;
+const jobKey=j=>sha(JSON.stringify({g:GLOBAL_KEY,scene:j.scene,p:j.p,nf:Math.round((j.end-j.start)*FPS),
+  ilu:/^(ilu|concept)$/.test(j.scene)?ILU_KEY:null,concept:j.scene==='concept'?[CONCEPT_KEY,LEGACY_KEY]:null,refs:refSigs(j.p)}));
+let CACHE={};try{CACHE=JSON.parse(fs.readFileSync(CACHE_F,'utf8'));}catch(e){}
+const saveCache=()=>{try{fs.writeFileSync(CACHE_F,JSON.stringify(CACHE,null,1));}catch(e){console.warn('render_cache: no se pudo guardar ('+e.message+')');}};
 async function main(){
   if(!CHROME)throw new Error('No encuentro Chrome. Instalalo o definí CHROME=/ruta/al/ejecutable');
   const only=process.argv.find(a=>a.startsWith('--only='));const test=process.argv.includes('--test');
@@ -249,6 +271,11 @@ async function main(){
   const A=path.join(cfg.edit_dir,'Assets');
   const outFor=j=>test?path.join(WD,'test'):path.join(A,j.track==='cap'?'Subtitulos':'MG');
   [path.join(A,'MG'),path.join(A,'Subtitulos'),path.join(WD,'test')].forEach(d=>fs.mkdirSync(d,{recursive:true}));
+  if(!test){const same=[];list=list.filter(j=>{j._key=jobKey(j);const f=path.join(outFor(j),j.id+'.mov');
+      const ok=!FORCE&&CACHE[j.id]===j._key&&fs.existsSync(f)&&fs.statSync(f).size>0;if(ok)same.push(j.id);return !ok;});
+    if(same.length)console.log(`sin cambios (no se renderizan): ${same.length} · ${same.join(' ')}`);
+    console.log(`a renderizar: ${list.length}`+(list.length?' · '+list.map(j=>j.id).join(' '):''));
+    if(!list.length)return;}
   const browser=await puppeteer.launch({executablePath:CHROME,headless:true,protocolTimeout:HW.protocolTimeout,args:['--allow-file-access-from-files','--force-device-scale-factor=1','--hide-scrollbars']});
   let qi=0;
   async function worker(){const page=await browser.newPage();await page.setViewport({width:1080,height:1920,deviceScaleFactor:1});
@@ -267,6 +294,7 @@ async function main(){
           await page.evaluate((t)=>frame(t,Math.round(t*30)),t);await page.screenshot({path:path.join(outFor(j),`${j.id}_t${t.toFixed(2)}.png`),omitBackground:true});}
         continue;}
       const outf=path.join(outFor(j),j.id+'.mov');
+      if(CACHE[j.id]){delete CACHE[j.id];saveCache();}   // si el render se corta a mitad, el .mov a medias no queda marcado como vigente
       // ProRes 4444 con alfa: lo leen Premiere y DaVinci Resolve (Mac y Windows); con grano pesa ~1/3 que Animation. config.mg_codec='qtrle' = Animation como antes
       const VC=cfg.mg_codec==='qtrle'?['-c:v','qtrle','-pix_fmt','argb']:['-c:v','prores_ks','-profile:v','4444','-pix_fmt','yuva444p10le','-alpha_bits','16','-vendor','apl0'];
       const ff=spawn('ffmpeg',['-v','error','-y','-f','image2pipe','-framerate',String(FPS),'-c:v','png','-i','-',...VC,outf]);
@@ -274,7 +302,9 @@ async function main(){
       for(let f=0;f<nf;f++){await page.evaluate((t,f)=>frame(t,f),f/FPS,f);
         let buf;for(let k=0;;k++){try{buf=await page.screenshot({omitBackground:true,type:'png',optimizeForSpeed:HW.fastShot});break;}catch(e){if(k>=2)throw e;}}  // reintento: en Windows captureScreenshot a veces se cuelga
         if(!ff.stdin.write(buf))await new Promise(r=>ff.stdin.once('drain',r));}
-      ff.stdin.end();await done;console.log('ok',j.id,nf+'f');}
+      ff.stdin.end();const code=await done;
+      if(code!==0){delete CACHE[j.id];saveCache();console.log('ERR',j.id,`ffmpeg terminó con código ${code}`);continue;}
+      CACHE[j.id]=j._key;saveCache();console.log('ok',j.id,nf+'f');}
     await page.close();}
   await Promise.all(Array.from({length:par},worker));await browser.close();
 }

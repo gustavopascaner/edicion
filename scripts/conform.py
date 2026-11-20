@@ -70,10 +70,22 @@ chain=''
 fc=(f'[0:v:0]setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase:out_color_matrix=bt709:out_range=tv,crop=1080:1920,setsar=1,'
     f'fps={FPS}:round=near,tpad=stop_mode=clone:stop_duration=2,trim=duration={T:.6f},setpts=PTS-STARTPTS,format=yuv420p[v];'
     f'[0:a:0]{afix}aresample=48000:async=1:first_pts=0,{chain}aformat=sample_fmts=s16:channel_layouts=stereo,apad,atrim=0:{T:.6f},asetpts=PTS-STARTPTS[a]')
-cmd=['ffmpeg','-v','error','-y','-i',SRC,'-filter_complex',fc,'-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','14','-g','15']+(['-threads',os.environ['EDICION_THREADS']] if os.environ.get('EDICION_THREADS') else [])+[
+# Velocidad del encode. Potente (Mac): preset fast, como siempre. Liviano (8 GB, la Windows del editor): preset superfast y decodificación
+# por hardware (-hwaccel auto: los crudos de celular suelen ser HEVC 4K, que en CPU es lo más lento); misma calidad (CRF 14), el master pesa más.
+# Pisar con EDICION_CONFORM_PRESET o "conform_preset" en config.json (ultrafast · superfast · veryfast · faster · fast · medium).
+import whisperlib as WL
+LIV=WL.liviano(W)
+try: _cfg=json.load(open(os.path.join(W,'config.json'),encoding='utf-8'))
+except Exception: _cfg={}
+PRESET=os.environ.get('EDICION_CONFORM_PRESET') or _cfg.get('conform_preset') or ('superfast' if LIV else 'fast')
+HWDEC=['-hwaccel','auto'] if LIV and os.environ.get('EDICION_CONFORM_HWDEC','1')!='0' else []
+def enc(hw): return ['ffmpeg','-v','error','-y',*hw,'-i',SRC,'-filter_complex',fc,'-map','[v]','-map','[a]','-c:v','libx264','-preset',PRESET,'-crf','14','-g','15']+(['-threads',os.environ['EDICION_THREADS']] if os.environ.get('EDICION_THREADS') else [])+[
      '-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-video_track_timescale','30000','-c:a','pcm_s16le','-ar','48000','-fps_mode','cfr','-r',str(FPS),OUT]
-print('… conformando el crudo (1 minuto de video tarda ~20-40 s)',flush=True)
-if subprocess.run(cmd).returncode: sys.exit('✗ ffmpeg falló conformando el crudo')
+print(f'… conformando el crudo (perfil {"liviano" if LIV else "potente"}, preset {PRESET}{", decodificación por hardware" if HWDEC else ""})',flush=True)
+rc=subprocess.run(enc(HWDEC)).returncode
+if rc and HWDEC:   # la decodificación por hardware falló con este crudo o esta placa → otra vez en CPU
+    print('  la decodificación por hardware falló: repito en CPU',flush=True);rc=subprocess.run(enc([])).returncode
+if rc: sys.exit('✗ ffmpeg falló conformando el crudo')
 # ── verificación del master ──
 d2,v2,a2=probe(OUT)
 nb=int(subprocess.run(['ffprobe','-v','error','-count_packets','-select_streams','v:0','-show_entries','stream=nb_read_packets','-of','csv=p=0',OUT],capture_output=True,text=True).stdout.strip().strip(',') or 0)
